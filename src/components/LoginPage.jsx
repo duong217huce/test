@@ -6,161 +6,159 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const navigate = useNavigate();
 
-  const handleSubmit = (e) => {
+  const handleLogin = (e) => {
     e.preventDefault();
     
-    // Kiểm tra đơn giản (có thể thêm logic xác thực phức tạp hơn)
+    // Mock authentication
     if (username && password) {
-      // Lưu thông tin đăng nhập vào localStorage (tùy chọn)
       localStorage.setItem('isLoggedIn', 'true');
       localStorage.setItem('username', username);
       
-      // Chuyển về trang chủ
+      // Check và set DP nếu chưa có
+      const existingPoints = localStorage.getItem('userPoints');
+      if (!existingPoints) {
+        localStorage.setItem('userPoints', '0');
+      }
+      
+      alert('Đăng nhập thành công!');
       navigate('/');
     } else {
-      alert('Vui lòng nhập đầy đủ tên đăng nhập và mật khẩu!');
+      alert('Vui lòng nhập đầy đủ thông tin!');
     }
   };
 
   return (
     <div style={{
-      display: 'flex',
-      justifyContent: 'center',
-      alignItems: 'center',
       minHeight: '100vh',
-      background: '#f5f5f5',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      background: 'linear-gradient(135deg, #eafcff 0%, #b4cbe0 100%)',
       fontFamily: 'Arial, sans-serif'
     }}>
       <div style={{
-        textAlign: 'center',
-        width: '100%'
+        background: '#fff',
+        padding: '40px',
+        borderRadius: '10px',
+        boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+        width: '400px'
       }}>
-        {/* Logo EDUCONNECT */}
         <h1 style={{
+          textAlign: 'center',
           color: '#e84c61',
-          fontSize: '36px',
-          fontWeight: 'bold',
           marginBottom: '10px',
-          letterSpacing: '1px'
+          fontSize: '28px'
         }}>
           EDUCONNECT
         </h1>
-        
-        {/* Tiêu đề Đăng nhập */}
         <h2 style={{
+          textAlign: 'center',
           color: '#133a5c',
-          fontSize: '20px',
-          fontWeight: 'normal',
-          marginBottom: '30px'
+          marginBottom: '30px',
+          fontSize: '22px'
         }}>
           Đăng nhập
         </h2>
-        
-        {/* Form đăng nhập */}
-        <div style={{
-          border: '2px solid #133a5c',
-          borderRadius: '8px',
-          padding: '40px 50px',
-          background: '#fff',
-          maxWidth: '450px',
-          margin: '0 auto',
-          boxShadow: '0 2px 8px rgba(0,0,0,0.05)'
-        }}>
-          <form onSubmit={handleSubmit}>
-            {/* Tên đăng nhập */}
-            <div style={{ marginBottom: '25px', textAlign: 'left' }}>
-              <label style={{
-                display: 'block',
-                marginBottom: '8px',
-                color: '#333',
-                fontSize: '14px'
-              }}>
-                Tên đăng nhập
-              </label>
-              <input
-                type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '10px 12px',
-                  fontSize: '14px',
-                  border: '1px solid #ccc',
-                  borderRadius: '4px',
-                  boxSizing: 'border-box',
-                  outline: 'none'
-                }}
-              />
-            </div>
-            
-            {/* Mật khẩu */}
-            <div style={{ marginBottom: '25px', textAlign: 'left' }}>
-              <label style={{
-                display: 'block',
-                marginBottom: '8px',
-                color: '#333',
-                fontSize: '14px'
-              }}>
-                Mật khẩu
-              </label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '10px 12px',
-                  fontSize: '14px',
-                  border: '1px solid #ccc',
-                  borderRadius: '4px',
-                  boxSizing: 'border-box',
-                  outline: 'none'
-                }}
-              />
-            </div>
-            
-            {/* Nút Đăng nhập */}
-            <button
-              type="submit"
-              style={{
-                width: '180px',
-                padding: '10px 0',
-                background: '#4ba3d6',
-                color: '#fff',
-                fontSize: '16px',
-                fontWeight: 'normal',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                marginBottom: '20px'
-              }}
-            >
-              Đăng nhập
-            </button>
-            
-            {/* Link phụ */}
-            <div style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              fontSize: '13px',
-              color: '#666'
+
+        <form onSubmit={handleLogin}>
+          <div style={{ marginBottom: '20px' }}>
+            <label style={{
+              display: 'block',
+              marginBottom: '8px',
+              color: '#133a5c',
+              fontSize: '14px'
             }}>
-              <a href="#" style={{
-                color: '#666',
-                textDecoration: 'none',
-                fontStyle: 'italic'
-              }}>
-                Quên mật khẩu?
-              </a>
-              <Link to="/register" style={{
-                color: '#666',
-                textDecoration: 'none'
-              }}>
-                Đăng ký
-              </Link>
-            </div>
-          </form>
-        </div>
+              Tên đăng nhập
+            </label>
+            <input
+              type="text"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '12px',
+                fontSize: '14px',
+                border: '1px solid #ccc',
+                borderRadius: '6px',
+                outline: 'none',
+                boxSizing: 'border-box'
+              }}
+              required
+            />
+          </div>
+
+          <div style={{ marginBottom: '20px' }}>
+            <label style={{
+              display: 'block',
+              marginBottom: '8px',
+              color: '#133a5c',
+              fontSize: '14px'
+            }}>
+              Mật khẩu
+            </label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '12px',
+                fontSize: '14px',
+                border: '1px solid #ccc',
+                borderRadius: '6px',
+                outline: 'none',
+                boxSizing: 'border-box'
+              }}
+              required
+            />
+          </div>
+
+          <div style={{
+            textAlign: 'right',
+            marginBottom: '20px'
+          }}>
+            <a href="#" style={{
+              color: '#4ba3d6',
+              fontSize: '13px',
+              textDecoration: 'none'
+            }}>
+              Quên mật khẩu?
+            </a>
+          </div>
+
+          <button
+            type="submit"
+            style={{
+              width: '100%',
+              padding: '12px',
+              background: '#4ba3d6',
+              color: '#fff',
+              border: 'none',
+              borderRadius: '6px',
+              fontSize: '16px',
+              fontWeight: 'bold',
+              cursor: 'pointer',
+              marginBottom: '15px'
+            }}
+          >
+            Đăng nhập
+          </button>
+
+          <div style={{
+            textAlign: 'center',
+            fontSize: '14px',
+            color: '#666'
+          }}>
+            Chưa có tài khoản?{' '}
+            <Link to="/register" style={{
+              color: '#4ba3d6',
+              textDecoration: 'none',
+              fontWeight: 'bold'
+            }}>
+              Đăng ký
+            </Link>
+          </div>
+        </form>
       </div>
     </div>
   );

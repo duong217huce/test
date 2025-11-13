@@ -61,15 +61,18 @@ const menuDropdowns = {
 export default function Header() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [username, setUsername] = useState('');
+  const [userPoints, setUserPoints] = useState(0);
   const [showDropdown, setShowDropdown] = useState(false);
   const [activeDropdown, setActiveDropdown] = useState(null);
 
   useEffect(() => {
     const loggedIn = localStorage.getItem('isLoggedIn') === 'true';
     const storedUsername = localStorage.getItem('username') || '';
+    const storedPoints = localStorage.getItem('userPoints') || '0';
     
     setIsLoggedIn(loggedIn);
     setUsername(storedUsername);
+    setUserPoints(parseInt(storedPoints));
   }, []);
 
   const handleLogout = () => {
@@ -84,8 +87,6 @@ export default function Header() {
   const handleProtectedAction = (actionName) => {
     if (!isLoggedIn) {
       alert(`Bạn cần đăng nhập để sử dụng chức năng ${actionName}!`);
-    } else {
-      console.log(`Đã truy cập ${actionName}`);
     }
   };
 
@@ -99,7 +100,6 @@ export default function Header() {
       background: '#eafcff',
       boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
     }}>
-      {/* Header */}
       <header style={{
         display: 'flex',
         alignItems: 'center',
@@ -109,7 +109,7 @@ export default function Header() {
         paddingLeft: '16px',
         paddingRight: '16px'
       }}>
-        <Link to="/" style={{ color: '#e84c61', fontWeight: 'bold', fontSize: '22px', marginRight: '32px', textDecoration: 'none', cursor: 'pointer' }}>
+        <Link to="/" style={{ color: '#e84c61', fontWeight: 'bold', fontSize: '22px', marginRight: '32px', textDecoration: 'none' }}>
           EDUCONNECT
         </Link>
         <div style={{ flex: 1 }}>
@@ -145,6 +145,44 @@ export default function Header() {
           >
             Upload
           </Link>
+          
+          {/* DP Points Display */}
+          {isLoggedIn && (
+            <div 
+              onClick={() => alert('Tính năng nạp điểm đang được phát triển!')}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '6px 16px',
+                background: '#fff3cd',
+                borderRadius: '20px',
+                border: '2px solid #ffc107',
+                cursor: 'pointer',
+                transition: 'all 0.2s'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = '#ffecb3';
+                e.currentTarget.style.transform = 'scale(1.05)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = '#fff3cd';
+                e.currentTarget.style.transform = 'scale(1)';
+              }}
+              title="Click để nạp điểm"
+            >
+              <span style={{ fontSize: '18px' }}>💎</span>
+              <span style={{ 
+                fontWeight: 'bold', 
+                color: '#ff8c00',
+                fontSize: '16px'
+              }}>
+                {userPoints} DP
+              </span>
+              <span style={{ fontSize: '12px', color: '#888' }}>+</span>
+            </div>
+          )}
+          
           <Link 
             to="/saved"
             onClick={(e) => {
@@ -157,9 +195,14 @@ export default function Header() {
           >
             Saved
           </Link>
+          
           {isLoggedIn ? (
             <div 
-              style={{ position: 'relative', display: 'inline-block' }}
+              style={{ 
+                position: 'relative', 
+                display: 'inline-block',
+                paddingBottom: '8px'
+              }}
               onMouseEnter={() => setShowDropdown(true)}
               onMouseLeave={() => setShowDropdown(false)}
             >
@@ -174,7 +217,8 @@ export default function Header() {
                   background: '#fff',
                   border: '1px solid #ccc',
                   borderRadius: '4px',
-                  marginTop: '8px',
+                  marginTop: '0px',
+                  paddingTop: '8px',
                   minWidth: '180px',
                   boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
                   zIndex: 1000
@@ -199,15 +243,6 @@ export default function Header() {
                     borderBottom: '1px solid #eee'
                   }}>
                     Cài đặt
-                  </a>
-                  <a href="#" style={{ 
-                    display: 'block', 
-                    padding: '10px 16px', 
-                    textDecoration: 'none', 
-                    color: '#333',
-                    borderBottom: '1px solid #eee'
-                  }}>
-                    Nap tien tai khoan
                   </a>
                   <button
                     onClick={handleLogout}
@@ -238,7 +273,6 @@ export default function Header() {
         </nav>
       </header>
       
-      {/* Menu */}
       <div style={{
         display: 'flex',
         justifyContent: 'center',
