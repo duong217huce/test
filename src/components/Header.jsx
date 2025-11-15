@@ -60,17 +60,23 @@ const menuDropdowns = {
 
 export default function Header() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [username, setUsername] = useState('');
   const [userPoints, setUserPoints] = useState(0);
   const [showDropdown, setShowDropdown] = useState(false);
   const [activeDropdown, setActiveDropdown] = useState(null);
 
   useEffect(() => {
+    if (localStorage.getItem('isLoggedIn') === null) {
+      localStorage.setItem('isLoggedIn', 'false');
+    }
     const loggedIn = localStorage.getItem('isLoggedIn') === 'true';
+    const storedAdmin = localStorage.getItem('isAdmin') === 'true';
     const storedUsername = localStorage.getItem('username') || '';
     const storedPoints = localStorage.getItem('userPoints') || '0';
-    
+
     setIsLoggedIn(loggedIn);
+    setIsAdmin(storedAdmin);
     setUsername(storedUsername);
     setUserPoints(parseInt(storedPoints));
   }, []);
@@ -78,7 +84,7 @@ export default function Header() {
   const handleLogout = () => {
     localStorage.removeItem('isLoggedIn');
     localStorage.removeItem('username');
-    
+    localStorage.removeItem('isAdmin');
     setIsLoggedIn(false);
     setUsername('');
     setShowDropdown(false);
@@ -146,43 +152,62 @@ export default function Header() {
             Upload
           </Link>
           
-          {/* DP Points Display */}
-          {isLoggedIn && (
-            <div 
-              onClick={() => alert('Tính năng nạp điểm đang được phát triển!')}
+          {/* Nếu là ADMIN hiện Quản lý - Thống kê */}
+          {isAdmin ? (
+            <Link
+              to="/admin"
               style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                padding: '6px 16px',
-                background: '#fff3cd',
+                padding: '7px 18px',
                 borderRadius: '20px',
+                background: '#fff3cd',
                 border: '2px solid #ffc107',
-                cursor: 'pointer',
-                transition: 'all 0.2s'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = '#ffecb3';
-                e.currentTarget.style.transform = 'scale(1.05)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = '#fff3cd';
-                e.currentTarget.style.transform = 'scale(1)';
-              }}
-              title="Click để nạp điểm"
-            >
-              <span style={{ fontSize: '18px' }}>💎</span>
-              <span style={{ 
-                fontWeight: 'bold', 
                 color: '#ff8c00',
-                fontSize: '16px'
-              }}>
-                {userPoints} DP
-              </span>
-              <span style={{ fontSize: '12px', color: '#888' }}>+</span>
-            </div>
+                fontWeight: 'bold',
+                fontSize: '15px',
+                position: 'relative'
+              }}
+            >
+              📊 Quản lý - Thống kê
+            </Link>
+          ) : (
+            // Nếu không phải admin mới hiển thị DP
+            isLoggedIn && (
+              <div 
+                onClick={() => alert('Tính năng nạp điểm đang được phát triển!')}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '6px 16px',
+                  background: '#fff3cd',
+                  borderRadius: '20px',
+                  border: '2px solid #ffc107',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = '#ffecb3';
+                  e.currentTarget.style.transform = 'scale(1.05)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = '#fff3cd';
+                  e.currentTarget.style.transform = 'scale(1)';
+                }}
+                title="Click để nạp điểm"
+              >
+                <span style={{ fontSize: '18px' }}>💎</span>
+                <span style={{ 
+                  fontWeight: 'bold', 
+                  color: '#ff8c00',
+                  fontSize: '16px'
+                }}>
+                  {userPoints} DP
+                </span>
+                <span style={{ fontSize: '12px', color: '#888' }}>+</span>
+              </div>
+            )
           )}
-          
+
           <Link 
             to="/saved"
             onClick={(e) => {
@@ -273,6 +298,7 @@ export default function Header() {
         </nav>
       </header>
       
+      {/* Menu chính category dropdown */}
       <div style={{
         display: 'flex',
         justifyContent: 'center',

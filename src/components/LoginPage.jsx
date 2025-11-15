@@ -1,30 +1,45 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 
 export default function LoginPage() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const navigate = useNavigate();
+  
+
+  useEffect(() => {
+    if (localStorage.getItem('isLoggedIn') === null) {
+      localStorage.setItem('isLoggedIn', 'false');
+    }
+    if (!localStorage.getItem('adminInitialized')) {
+      localStorage.setItem('adminUsername', 'admin');
+      localStorage.setItem('adminPassword', '123');
+      localStorage.setItem('adminInitialized', 'true');
+    }
+  }, []);
 
   const handleLogin = (e) => {
     e.preventDefault();
-    
-    // Mock authentication
-    if (username && password) {
+
+    const adminUser = localStorage.getItem('adminUsername') || 'admin';
+    const adminPass = localStorage.getItem('adminPassword') || '123';
+
+    if (username === adminUser && password === adminPass) {
       localStorage.setItem('isLoggedIn', 'true');
       localStorage.setItem('username', username);
-      
-      // Check và set DP nếu chưa có
-      const existingPoints = localStorage.getItem('userPoints');
-      if (!existingPoints) {
-        localStorage.setItem('userPoints', '0');
-      }
-      
-      alert('Đăng nhập thành công!');
+      localStorage.setItem('isAdmin', 'true');
+      alert('Đăng nhập admin thành công!');
       navigate('/');
-    } else {
-      alert('Vui lòng nhập đầy đủ thông tin!');
+      window.location.reload();
+      return;
     }
+
+    localStorage.setItem('isLoggedIn', 'true');
+    localStorage.setItem('username', username);
+    localStorage.setItem('isAdmin', 'false');
+    alert('Đăng nhập thành công!');
+    navigate('/');
+    window.location.reload();
   };
 
   return (
@@ -43,31 +58,15 @@ export default function LoginPage() {
         boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
         width: '400px'
       }}>
-        <h1 style={{
-          textAlign: 'center',
-          color: '#e84c61',
-          marginBottom: '10px',
-          fontSize: '28px'
-        }}>
+        <h1 style={{ textAlign: 'center', color: '#e84c61', marginBottom: '10px', fontSize: '28px' }}>
           EDUCONNECT
         </h1>
-        <h2 style={{
-          textAlign: 'center',
-          color: '#133a5c',
-          marginBottom: '30px',
-          fontSize: '22px'
-        }}>
+        <h2 style={{ textAlign: 'center', color: '#133a5c', marginBottom: '30px', fontSize: '22px' }}>
           Đăng nhập
         </h2>
-
         <form onSubmit={handleLogin}>
           <div style={{ marginBottom: '20px' }}>
-            <label style={{
-              display: 'block',
-              marginBottom: '8px',
-              color: '#133a5c',
-              fontSize: '14px'
-            }}>
+            <label style={{ display: 'block', marginBottom: '8px', color: '#133a5c', fontSize: '14px' }}>
               Tên đăng nhập
             </label>
             <input
@@ -86,14 +85,8 @@ export default function LoginPage() {
               required
             />
           </div>
-
           <div style={{ marginBottom: '20px' }}>
-            <label style={{
-              display: 'block',
-              marginBottom: '8px',
-              color: '#133a5c',
-              fontSize: '14px'
-            }}>
+            <label style={{ display: 'block', marginBottom: '8px', color: '#133a5c', fontSize: '14px' }}>
               Mật khẩu
             </label>
             <input
@@ -112,20 +105,6 @@ export default function LoginPage() {
               required
             />
           </div>
-
-          <div style={{
-            textAlign: 'right',
-            marginBottom: '20px'
-          }}>
-            <a href="#" style={{
-              color: '#4ba3d6',
-              fontSize: '13px',
-              textDecoration: 'none'
-            }}>
-              Quên mật khẩu?
-            </a>
-          </div>
-
           <button
             type="submit"
             style={{
@@ -143,18 +122,9 @@ export default function LoginPage() {
           >
             Đăng nhập
           </button>
-
-          <div style={{
-            textAlign: 'center',
-            fontSize: '14px',
-            color: '#666'
-          }}>
+          <div style={{ textAlign: 'center', fontSize: '14px', color: '#666' }}>
             Chưa có tài khoản?{' '}
-            <Link to="/register" style={{
-              color: '#4ba3d6',
-              textDecoration: 'none',
-              fontWeight: 'bold'
-            }}>
+            <Link to="/register" style={{ color: '#4ba3d6', textDecoration: 'none', fontWeight: 'bold' }}>
               Đăng ký
             </Link>
           </div>

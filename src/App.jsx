@@ -7,6 +7,8 @@ import UploadPage from "./components/UploadPage";
 import DocumentDetailPage from "./components/DocumentDetailPage";
 import SavedPage from "./components/SavedPage";
 import ProfilePage from "./components/ProfilePage";
+import AdminDashboard from "./components/AdminDashboard";
+
 
 function App() {
   return (
@@ -20,6 +22,7 @@ function App() {
         <Route path="/document/:id" element={<DocumentDetailPage />} />
         <Route path="/saved" element={<SavedPage />} />
         <Route path="/profile" element={<ProfilePage />} />
+        <Route path="/admin" element={<AdminDashboard />} />
       </Routes>
     </Router>
   );
