@@ -1,18 +1,23 @@
 const jwt = require('jsonwebtoken');
 
-module.exports = (req, res, next) => {
+module.exports = function(req, res, next) {
   try {
-    const token = req.headers.authorization?.split(' ')[1];
+    const token = req.header('Authorization')?.replace('Bearer ', '');
     
+    console.log('🔐 Auth middleware - Token:', token ? 'Có' : 'Không có');
+
     if (!token) {
-      return res.status(401).json({ message: 'Không có quyền truy cập' });
+      console.log('⚠️ No token provided');
+      return res.status(401).json({ message: 'No token, authorization denied' });
     }
-    
+
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.userId = decoded.userId;
-    req.userRole = decoded.role;
+    req.user = decoded;
+    
+    console.log('✅ User authenticated:', { id: decoded.id, username: decoded.username });
     next();
   } catch (error) {
-    res.status(401).json({ message: 'Token không hợp lệ' });
+    console.error('❌ Auth error:', error.message);
+    res.status(401).json({ message: 'Token is not valid' });
   }
 };

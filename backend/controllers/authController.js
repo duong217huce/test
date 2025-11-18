@@ -6,13 +6,16 @@ exports.register = async (req, res) => {
   try {
     const { username, email, password, fullName } = req.body;
     
+    // Kiểm tra user đã tồn tại
     const existingUser = await User.findOne({ $or: [{ email }, { username }] });
     if (existingUser) {
       return res.status(400).json({ message: 'User đã tồn tại' });
     }
     
+    // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
     
+    // Tạo user mới
     const user = new User({
       username,
       email,
@@ -59,6 +62,18 @@ exports.login = async (req, res) => {
         documentPoints: user.documentPoints
       }
     });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+exports.getProfile = async (req, res) => {
+  try {
+    const user = await User.findById(req.userId).select('-password');
+    if (!user) {
+      return res.status(404).json({ message: 'User không tồn tại' });
+    }
+    res.json(user);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
