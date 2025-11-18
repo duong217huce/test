@@ -5,27 +5,62 @@ export default function RegisterPage() {
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
   const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  const handleRegister = (e) => {
+  const handleRegister = async (e) => {
     e.preventDefault();
+    setError('');
     
     if (password !== confirmPassword) {
-      alert('Mật khẩu không khớp!');
+      setError('Mật khẩu không khớp!');
       return;
     }
-    
-    // Lưu thông tin đăng ký
-    localStorage.setItem('isLoggedIn', 'true');
-    localStorage.setItem('username', username);
-    localStorage.setItem('fullName', fullName);
-    localStorage.setItem('phone', phone);
-    localStorage.setItem('userPoints', '0'); // Tài khoản mới = 0 DP
-    
-    alert('Đăng ký tài khoản thành công!');
-    navigate('/');
+
+    if (password.length < 6) {
+      setError('Mật khẩu phải có ít nhất 6 ký tự!');
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const response = await fetch('http://localhost:5000/api/auth/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          username,
+          email: email || `${username}@example.com`, // Nếu không nhập email thì tạo mặc định
+          password,
+          fullName
+        })
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        // Lưu thông tin cơ bản vào localStorage (tương thích với code cũ)
+        localStorage.setItem('username', username);
+        localStorage.setItem('fullName', fullName);
+        localStorage.setItem('phone', phone);
+        
+        alert('Đăng ký tài khoản thành công!');
+        navigate('/login');
+      } else {
+        setError(data.message || 'Đăng ký thất bại!');
+      }
+    } catch (error) {
+      console.error('Lỗi:', error);
+      setError('Không thể kết nối đến server!');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -64,6 +99,20 @@ export default function RegisterPage() {
         }}>
           Đăng ký tài khoản
         </h2>
+
+        {error && (
+          <div style={{
+            backgroundColor: '#ffebee',
+            color: '#c62828',
+            padding: '12px',
+            borderRadius: '6px',
+            marginBottom: '20px',
+            fontSize: '14px',
+            textAlign: 'center'
+          }}>
+            {error}
+          </div>
+        )}
 
         <form onSubmit={handleRegister}>
           {/* Họ và tên */}
@@ -121,6 +170,34 @@ export default function RegisterPage() {
                 boxSizing: 'border-box'
               }}
               required
+            />
+          </div>
+
+          {/* Email (tùy chọn) */}
+          <div style={{ marginBottom: '20px' }}>
+            <label style={{
+              display: 'block',
+              marginBottom: '8px',
+              color: '#133a5c',
+              fontSize: '14px',
+              fontWeight: '500'
+            }}>
+              Email (tùy chọn)
+            </label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="Ví dụ: email@example.com"
+              style={{
+                width: '100%',
+                padding: '12px',
+                fontSize: '14px',
+                border: '1px solid #ccc',
+                borderRadius: '6px',
+                outline: 'none',
+                boxSizing: 'border-box'
+              }}
             />
           </div>
 
@@ -211,20 +288,21 @@ export default function RegisterPage() {
           {/* Nút đăng ký */}
           <button
             type="submit"
+            disabled={loading}
             style={{
               width: '100%',
               padding: '12px',
-              background: '#4ba3d6',
+              background: loading ? '#ccc' : '#4ba3d6',
               color: '#fff',
               border: 'none',
               borderRadius: '6px',
               fontSize: '16px',
               fontWeight: 'bold',
-              cursor: 'pointer',
+              cursor: loading ? 'not-allowed' : 'pointer',
               marginBottom: '15px'
             }}
           >
-            Đăng ký
+            {loading ? 'Đang đăng ký...' : 'Đăng ký'}
           </button>
 
           {/* Link đăng nhập */}

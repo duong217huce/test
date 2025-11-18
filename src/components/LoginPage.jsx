@@ -4,13 +4,12 @@ import { Link, useNavigate } from 'react-router-dom';
 export default function LoginPage() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
-  
 
   useEffect(() => {
-    if (localStorage.getItem('isLoggedIn') === null) {
-      localStorage.setItem('isLoggedIn', 'false');
-    }
+    // Khởi tạo admin account mặc định trong localStorage
     if (!localStorage.getItem('adminInitialized')) {
       localStorage.setItem('adminUsername', 'admin');
       localStorage.setItem('adminPassword', '123');
@@ -18,28 +17,66 @@ export default function LoginPage() {
     }
   }, []);
 
-  const handleLogin = (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
+    setError('');
 
+    // Kiểm tra admin login (local)
     const adminUser = localStorage.getItem('adminUsername') || 'admin';
     const adminPass = localStorage.getItem('adminPassword') || '123';
 
     if (username === adminUser && password === adminPass) {
       localStorage.setItem('isLoggedIn', 'true');
       localStorage.setItem('username', username);
+      localStorage.setItem('userId', 'admin-local-id'); // ✅ Thêm userId cho admin
+      localStorage.setItem('role', 'admin'); // ✅ Thêm role
       localStorage.setItem('isAdmin', 'true');
+      localStorage.setItem('fullName', 'Admin');
+      localStorage.setItem('userPoints', '999999');
       alert('Đăng nhập admin thành công!');
       navigate('/');
       window.location.reload();
       return;
     }
 
-    localStorage.setItem('isLoggedIn', 'true');
-    localStorage.setItem('username', username);
-    localStorage.setItem('isAdmin', 'false');
-    alert('Đăng nhập thành công!');
-    navigate('/');
-    window.location.reload();
+    // Đăng nhập thông qua backend API
+    setLoading(true);
+
+    try {
+      const response = await fetch('http://localhost:5000/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ username, password })
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        // Lưu token và thông tin user
+        localStorage.setItem('token', data.token);
+        localStorage.setItem('isLoggedIn', 'true');
+        localStorage.setItem('username', data.user.username);
+        localStorage.setItem('userId', data.user.id); // ✅ Thêm userId
+        localStorage.setItem('role', data.user.role); // ✅ Thêm role
+        localStorage.setItem('fullName', data.user.fullName);
+        localStorage.setItem('isAdmin', data.user.role === 'admin' ? 'true' : 'false');
+        localStorage.setItem('userPoints', data.user.documentPoints.toString());
+        localStorage.setItem('user', JSON.stringify(data.user));
+
+        alert(`Chào mừng ${data.user.fullName}!`);
+        navigate('/');
+        window.location.reload();
+      } else {
+        setError(data.message || 'Đăng nhập thất bại!');
+      }
+    } catch (error) {
+      console.error('Lỗi:', error);
+      setError('Không thể kết nối đến server!');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -64,6 +101,21 @@ export default function LoginPage() {
         <h2 style={{ textAlign: 'center', color: '#133a5c', marginBottom: '30px', fontSize: '22px' }}>
           Đăng nhập
         </h2>
+
+        {error && (
+          <div style={{
+            backgroundColor: '#ffebee',
+            color: '#c62828',
+            padding: '12px',
+            borderRadius: '6px',
+            marginBottom: '20px',
+            fontSize: '14px',
+            textAlign: 'center'
+          }}>
+            {error}
+          </div>
+        )}
+
         <form onSubmit={handleLogin}>
           <div style={{ marginBottom: '20px' }}>
             <label style={{ display: 'block', marginBottom: '8px', color: '#133a5c', fontSize: '14px' }}>
@@ -107,20 +159,21 @@ export default function LoginPage() {
           </div>
           <button
             type="submit"
+            disabled={loading}
             style={{
               width: '100%',
               padding: '12px',
-              background: '#4ba3d6',
+              background: loading ? '#ccc' : '#4ba3d6',
               color: '#fff',
               border: 'none',
               borderRadius: '6px',
               fontSize: '16px',
               fontWeight: 'bold',
-              cursor: 'pointer',
+              cursor: loading ? 'not-allowed' : 'pointer',
               marginBottom: '15px'
             }}
           >
-            Đăng nhập
+            {loading ? 'Đang đăng nhập...' : 'Đăng nhập'}
           </button>
           <div style={{ textAlign: 'center', fontSize: '14px', color: '#666' }}>
             Chưa có tài khoản?{' '}

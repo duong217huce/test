@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 const menuItems = [
   'Giáo dục phổ thông',
@@ -59,6 +59,7 @@ const menuDropdowns = {
 };
 
 export default function Header() {
+  const navigate = useNavigate();
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [username, setUsername] = useState('');
@@ -85,15 +86,25 @@ export default function Header() {
     localStorage.removeItem('isLoggedIn');
     localStorage.removeItem('username');
     localStorage.removeItem('isAdmin');
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
     setIsLoggedIn(false);
     setUsername('');
     setShowDropdown(false);
+    navigate('/');
   };
 
   const handleProtectedAction = (actionName) => {
     if (!isLoggedIn) {
       alert(`Bạn cần đăng nhập để sử dụng chức năng ${actionName}!`);
     }
+  };
+
+  const handleSubItemClick = (subItem) => {
+    // Chuyển đổi tên mục thành URL-friendly format
+    const urlParam = subItem.toLowerCase().replace(/\s+/g, '-');
+    navigate(`/category/${urlParam}`);
+    setActiveDropdown(null); // Đóng dropdown sau khi click
   };
 
   return (
@@ -164,7 +175,8 @@ export default function Header() {
                 color: '#ff8c00',
                 fontWeight: 'bold',
                 fontSize: '15px',
-                position: 'relative'
+                position: 'relative',
+                textDecoration: 'none'
               }}
             >
               📊 Quản lý - Thống kê
@@ -372,6 +384,7 @@ export default function Header() {
                           fontSize: '14px',
                           fontWeight: 'normal'
                         }}
+                        onClick={() => handleSubItemClick(subItem)}
                         onMouseEnter={(e) => e.target.style.color = '#e84c61'}
                         onMouseLeave={(e) => e.target.style.color = '#2d4a67'}
                       >

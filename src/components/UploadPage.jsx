@@ -26,6 +26,7 @@ export default function UploadPage() {
     grade: '',
     subject: ''
   });
+  const [uploading, setUploading] = useState(false);
 
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -59,27 +60,79 @@ export default function UploadPage() {
     }
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    // Validation: Phải chọn ít nhất 1 trong 2
+
+    // Validation
     if (!formData.grade && !formData.subject) {
       alert('Vui lòng chọn ít nhất Cấp học hoặc Môn học/Lĩnh vực!');
       return;
     }
-    
     if (!formData.file) {
       alert('Vui lòng chọn file để upload!');
       return;
     }
-    
-    console.log('Upload data:', formData);
+    if (!formData.title || !formData.description) {
+      alert('Vui lòng nhập đầy đủ tiêu đề và nội dung tóm tắt!');
+      return;
+    }
+
     const selectedInfo = [
       formData.grade,
       formData.subject
     ].filter(Boolean).join(' - ');
-    
-    alert(`Tài liệu đã được upload thành công!\nDanh mục: ${selectedInfo}`);
+
+    // Tạo form data để gửi file (multipart/form-data)
+    const apiData = new FormData();
+    apiData.append('title', formData.title);
+    apiData.append('description', formData.description);
+    apiData.append('category', formData.grade || formData.subject);
+    apiData.append('tags', [formData.grade, formData.subject].filter(Boolean).join(','));
+    apiData.append('fileType', formData.file.type);
+    apiData.append('fileSize', formData.file.size);
+    apiData.append('isPaid', false);
+    apiData.append('price', 0);
+    apiData.append('file', formData.file);
+
+    // Lấy token từ localStorage
+    const token = localStorage.getItem('token');
+
+    if (!token) {
+      alert('Bạn cần đăng nhập để upload tài liệu!');
+      navigate('/login');
+      return;
+    }
+
+    setUploading(true);
+
+    try {
+      const response = await fetch('http://localhost:5000/api/documents', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        body: apiData
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        alert(`Tài liệu đã được upload thành công!\nDanh mục: ${selectedInfo}\n\nBạn nhận được 10 DP!`);
+        
+        // Cập nhật điểm trong localStorage
+        const currentPoints = parseInt(localStorage.getItem('userPoints') || '0');
+        localStorage.setItem('userPoints', (currentPoints + 10).toString());
+        
+        navigate('/');
+      } else {
+        alert(data.message || 'Upload thất bại!');
+      }
+    } catch (error) {
+      console.error('Lỗi:', error);
+      alert('Không thể upload tài liệu! Vui lòng kiểm tra kết nối server.');
+    } finally {
+      setUploading(false);
+    }
   };
 
   const handleCancel = () => {
@@ -154,6 +207,7 @@ export default function UploadPage() {
               onChange={handleInputChange}
               required
               rows="6"
+              placeholder="Mô tả ngắn gọn về nội dung tài liệu..."
               style={{
                 width: '100%',
                 padding: '12px',
@@ -300,7 +354,7 @@ export default function UploadPage() {
                 id="fileInput"
                 type="file"
                 onChange={handleFileChange}
-                accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx"
+                accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt"
                 style={{ display: 'none' }}
               />
               
@@ -357,9 +411,29 @@ export default function UploadPage() {
                   }}>
                     Kéo & thả tài liệu vào đây hoặc bấm để chọn
                   </div>
+                  <div style={{
+                    fontSize: '12px',
+                    color: '#aaa',
+                    marginTop: '8px'
+                  }}>
+                    Định dạng: PDF, DOC, DOCX, PPT, PPTX, XLS, XLSX, TXT
+                  </div>
                 </div>
               )}
             </div>
+          </div>
+
+          {/* Thông báo thưởng điểm */}
+          <div style={{
+            background: '#fff3cd',
+            border: '1px solid #ffc107',
+            borderRadius: '6px',
+            padding: '12px 16px',
+            marginBottom: '25px',
+            fontSize: '14px',
+            color: '#856404'
+          }}>
+            💎 <strong>Thưởng:</strong> Bạn sẽ nhận được <strong>10 DP</strong> khi upload thành công!
           </div>
 
           {/* Buttons */}
@@ -371,6 +445,7 @@ export default function UploadPage() {
             <button
               type="button"
               onClick={handleCancel}
+              disabled={uploading}
               style={{
                 padding: '10px 30px',
                 background: '#fff',
@@ -378,26 +453,28 @@ export default function UploadPage() {
                 border: '1px solid #ccc',
                 borderRadius: '6px',
                 fontSize: '14px',
-                cursor: 'pointer',
-                fontWeight: 'normal'
+                cursor: uploading ? 'not-allowed' : 'pointer',
+                fontWeight: 'normal',
+                opacity: uploading ? 0.6 : 1
               }}
             >
               Hủy
             </button>
             <button
               type="submit"
+              disabled={uploading}
               style={{
                 padding: '10px 30px',
-                background: '#0d7a4f',
+                background: uploading ? '#ccc' : '#0d7a4f',
                 color: '#fff',
                 border: 'none',
                 borderRadius: '6px',
                 fontSize: '14px',
                 fontWeight: 'bold',
-                cursor: 'pointer'
+                cursor: uploading ? 'not-allowed' : 'pointer'
               }}
             >
-              Upload
+              {uploading ? 'Đang upload...' : 'Upload'}
             </button>
           </div>
         </form>

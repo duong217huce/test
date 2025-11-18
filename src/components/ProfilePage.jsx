@@ -2,54 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import Header from './Header';
 
-// Mock user data
-const mockUserData = {
-  username: 'nguyenvana',
-  fullName: 'Nguyễn Văn A',
-  email: 'nguyenvana@example.com',
-  phone: '0123456789',
-  joinDate: '15/08/2024',
-  totalUploads: 12,
-  totalDownloads: 1234,
-  totalViews: 5678,
-  bio: 'Sinh viên năm 3 ngành Công nghệ thông tin, đam mê chia sẻ kiến thức và tài liệu học tập.',
-  avatar: null // URL avatar nếu có
-};
-
-// Mock uploaded documents
-const mockUploadedDocs = [
-  {
-    id: 1,
-    title: 'Giáo trình Toán cao cấp A1',
-    pages: 245,
-    uploadDate: '15/10/2024',
-    downloads: 234,
-    views: 567,
-    grade: 'Đại học',
-    subject: 'Toán'
-  },
-  {
-    id: 2,
-    title: 'Bài tập Vật lý đại cương',
-    pages: 120,
-    uploadDate: '10/10/2024',
-    downloads: 156,
-    views: 423,
-    grade: 'Đại học',
-    subject: 'Vật lý'
-  },
-  {
-    id: 3,
-    title: 'Chuyên đề Hóa học hữu cơ',
-    pages: 180,
-    uploadDate: '05/10/2024',
-    downloads: 189,
-    views: 512,
-    grade: 'Lớp 11',
-    subject: 'Hóa học'
-  }
-];
-
 const cardStyle = {
   background: '#b4cbe0',
   width: '100%',
@@ -64,9 +16,22 @@ const cardStyle = {
 
 export default function ProfilePage() {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState('info'); // info, uploads
-  const [userData, setUserData] = useState(mockUserData);
+  const [activeTab, setActiveTab] = useState('info');
+  const [userData, setUserData] = useState({
+    username: '',
+    fullName: '',
+    email: '',
+    phone: '',
+    joinDate: '',
+    totalUploads: 0,
+    totalDownloads: 0,
+    totalViews: 0,
+    bio: '',
+    avatar: null
+  });
+  const [uploadedDocs, setUploadedDocs] = useState([]);
   const [isEditing, setIsEditing] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     // Check if user is logged in
@@ -74,14 +39,75 @@ export default function ProfilePage() {
     if (!isLoggedIn) {
       alert('Vui lòng đăng nhập để xem trang cá nhân');
       navigate('/login');
+      return;
     }
 
     // Get user data from localStorage
+    const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
     const storedUsername = localStorage.getItem('username');
-    if (storedUsername) {
-      setUserData(prev => ({ ...prev, username: storedUsername }));
-    }
+    const storedFullName = localStorage.getItem('fullName');
+    
+    setUserData({
+      username: storedUsername || storedUser.username || '',
+      fullName: storedFullName || storedUser.fullName || '',
+      email: storedUser.email || '',
+      phone: localStorage.getItem('phone') || '',
+      joinDate: new Date(storedUser.createdAt || Date.now()).toLocaleDateString('vi-VN'),
+      totalUploads: 0,
+      totalDownloads: 0,
+      totalViews: 0,
+      bio: 'Thành viên của EDUCONNECT',
+      avatar: null
+    });
+
+    // Fetch uploaded documents
+    fetchUploadedDocs();
   }, [navigate]);
+
+  const fetchUploadedDocs = async () => {
+    setLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      const user = JSON.parse(localStorage.getItem('user') || '{}');
+      
+      if (!token || !user.id) {
+        setUploadedDocs([]);
+        setLoading(false);
+        return;
+      }
+
+      const response = await fetch('http://localhost:5000/api/documents', {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      
+      const allDocs = await response.json();
+      
+      // Filter documents uploaded by current user
+      const myDocs = allDocs.filter(doc => 
+        doc.uploadedBy && (doc.uploadedBy._id === user.id || doc.uploadedBy === user.id)
+      );
+      
+      setUploadedDocs(myDocs);
+      
+      // Update stats
+      const totalDownloads = myDocs.reduce((sum, doc) => sum + (doc.downloads || 0), 0);
+      const totalViews = myDocs.reduce((sum, doc) => sum + (doc.views || 0), 0);
+      
+      setUserData(prev => ({
+        ...prev,
+        totalUploads: myDocs.length,
+        totalDownloads,
+        totalViews
+      }));
+    } catch (error) {
+      console.error('Lỗi khi tải tài liệu:', error);
+      setUploadedDocs([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleEdit = () => {
     setIsEditing(!isEditing);
@@ -245,7 +271,7 @@ export default function ProfilePage() {
                   transition: 'all 0.2s'
                 }}
               >
-                Tài liệu đã tải lên ({mockUploadedDocs.length})
+                Tài liệu đã tải lên ({uploadedDocs.length})
               </button>
             </div>
 
@@ -301,16 +327,20 @@ export default function ProfilePage() {
             ) : (
               // Uploads tab
               <div>
-                {mockUploadedDocs.length > 0 ? (
+                {loading ? (
+                  <div style={{ textAlign: 'center', padding: '60px', color: '#888' }}>
+                    Đang tải tài liệu...
+                  </div>
+                ) : uploadedDocs.length > 0 ? (
                   <div style={{
                     display: 'grid',
                     gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))',
                     gap: '20px'
                   }}>
-                    {mockUploadedDocs.map((doc) => (
+                    {uploadedDocs.map((doc) => (
                       <Link
-                        to={`/document/${doc.id}`}
-                        key={doc.id}
+                        to={`/document/${doc._id}`}
+                        key={doc._id}
                         style={{
                           textDecoration: 'none',
                           color: 'inherit'
@@ -348,7 +378,7 @@ export default function ProfilePage() {
                             </div>
                             
                             <div style={{ fontSize: '12px', color: '#2d4a67', marginBottom: '8px' }}>
-                              <span style={{ color: '#888' }}>📊</span> {doc.downloads} lượt tải • {doc.views} lượt xem
+                              <span style={{ color: '#888' }}>📊</span> {doc.downloads || 0} lượt tải • {doc.views || 0} lượt xem
                             </div>
                             
                             <div style={{
@@ -357,7 +387,7 @@ export default function ProfilePage() {
                               paddingTop: '8px',
                               borderTop: '1px solid #eee'
                             }}>
-                              Đăng ngày: {doc.uploadDate}
+                              Đăng ngày: {new Date(doc.uploadDate).toLocaleDateString('vi-VN')}
                             </div>
                           </div>
                         </div>

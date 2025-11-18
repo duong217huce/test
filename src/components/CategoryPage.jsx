@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import Header from './Header';
 import FilterBar from './FilterBar';
@@ -11,6 +11,33 @@ const categoryTitles = {
   'templates': 'Văn mẫu - Biểu mẫu',
   'thesis': 'Luận văn - Báo Cáo',
   'practice': 'Ôn tập trắc nghiệm'
+};
+
+// Định nghĩa các tag con thuộc về từng menu item cha
+const categoryHierarchy = {
+  'education': ['Lớp 1', 'Lớp 2', 'Lớp 3', 'Lớp 4', 'Lớp 5', 
+                'Lớp 6', 'Lớp 7', 'Lớp 8', 'Lớp 9',
+                'Lớp 10', 'Lớp 11', 'Lớp 12', 'Đại học'],
+  'professional': ['Tài chính', 'Kế toán', 'Marketing', 'Quản trị',
+                   'Lập trình', 'Mạng máy tính', 'An ninh mạng', 'AI/ML',
+                   'Nội khoa', 'Ngoại khoa', 'Dược học',
+                   'Luật', 'Kiến trúc', 'Nông nghiệp', 'Kinh tế', 'Công nghệ', 'Y học'],
+  'literature': ['Thơ', 'Truyện ngắn', 'Tiểu thuyết', 'Văn xuôi',
+                 'Châu Âu', 'Châu Á', 'Châu Mỹ',
+                 'Truyện tranh', 'Light novel', 'Truyện teen',
+                 'Trinh thám', 'Kinh dị', 'Lãng mạn'],
+  'templates': ['Tả người', 'Tả cảnh', 'Nghị luận', 'Thuyết minh',
+                'Đơn xin việc', 'Sơ yếu lý lịch', 'Giấy ủy quyền',
+                'Đơn xin nghỉ học', 'Đơn xin chuyển trường',
+                'Hợp đồng', 'Giấy tờ pháp lý'],
+  'thesis': ['Cử nhân', 'Thạc sĩ', 'Tiến sĩ',
+             'Thực tập', 'Nghiên cứu', 'Tiểu luận',
+             'Khoa học tự nhiên', 'Khoa học xã hội',
+             'Cách viết', 'Format', 'Trích dẫn'],
+  'practice': ['Toán', 'Văn', 'Anh', 'Lý', 'Hóa', 'Sinh',
+               'Đề thi thử', 'Luyện thi',
+               'TOEIC', 'IELTS', 'HSK', 'JLPT',
+               'Luật', 'Hành chính', 'Kinh tế']
 };
 
 const categoryConfigs = {
@@ -68,30 +95,6 @@ const categoryConfigs = {
   }
 };
 
-// Mock data với đầy đủ thông tin
-const mockDocuments = [
-  { id: 1, title: 'Toán nâng cao lớp 10', pages: 245, author: 'Nguyễn Văn A', grade: 'Lớp 10', subject: 'Toán', image: 'Ảnh bìa' },
-  { id: 2, title: 'Văn học lớp 11', pages: 180, author: 'Trần Thị B', grade: 'Lớp 11', subject: 'Văn', image: 'Ảnh bìa' },
-  { id: 3, title: 'English Grammar 12', pages: 200, author: 'Lê Văn C', grade: 'Lớp 12', subject: 'Tiếng Anh', image: 'Ảnh bìa' },
-  { id: 4, title: 'Vật lý đại cương', pages: 320, author: 'Phạm Thị D', grade: 'Lớp 10', subject: 'Vật lý', image: 'Ảnh bìa' },
-  { id: 5, title: 'Hóa học hữu cơ', pages: 150, author: 'Hoàng Văn E', grade: 'Lớp 11', subject: 'Hóa học', image: 'Ảnh bìa' },
-  { id: 6, title: 'Toán lớp 8', pages: 160, author: 'Võ Thị F', grade: 'Lớp 8', subject: 'Toán', image: 'Ảnh bìa' },
-  { id: 7, title: 'Sinh học lớp 9', pages: 140, author: 'Đỗ Văn G', grade: 'Lớp 9', subject: 'Sinh học', image: 'Ảnh bìa' },
-  { id: 8, title: 'Lịch sử Việt Nam', pages: 220, author: 'Bùi Thị H', grade: 'Lớp 9', subject: 'Lịch sử', image: 'Ảnh bìa' },
-  { id: 9, title: 'Toán lớp 5', pages: 100, author: 'Ngô Văn I', grade: 'Lớp 5', subject: 'Toán', image: 'Ảnh bìa' },
-  { id: 10, title: 'Tiếng Việt lớp 3', pages: 90, author: 'Phan Thị K', grade: 'Lớp 3', subject: 'Văn', image: 'Ảnh bìa' },
-  { id: 11, title: 'Toán cao cấp A1', pages: 300, author: 'TS. Nguyễn L', grade: 'Đại học', subject: 'Toán', image: 'Ảnh bìa' },
-  { id: 12, title: 'Lập trình C++', pages: 250, author: 'ThS. Trần M', grade: 'Đại học', subject: 'Lập trình', image: 'Ảnh bìa' },
-  { id: 13, title: 'Kinh tế vi mô', pages: 280, author: 'PGS. Lê N', grade: 'Đại học', subject: 'Kinh tế', image: 'Ảnh bìa' },
-  { id: 14, title: 'Vật lý đại cương 1', pages: 350, author: 'GS. Phạm O', grade: 'Đại học', subject: 'Vật lý', image: 'Ảnh bìa' },
-  { id: 15, title: 'Cơ sở dữ liệu', pages: 200, author: 'TS. Hoàng P', grade: 'Đại học', subject: 'Tin học', image: 'Ảnh bìa' },
-  { id: 16, title: 'Địa lý lớp 12', pages: 190, author: 'Võ Văn Q', grade: 'Lớp 12', subject: 'Địa lý', image: 'Ảnh bìa' },
-  { id: 17, title: 'GDCD lớp 10', pages: 120, author: 'Đặng Thị R', grade: 'Lớp 10', subject: 'GDCD', image: 'Ảnh bìa' },
-  { id: 18, title: 'Marketing căn bản', pages: 230, author: 'TS. Bùi S', grade: 'Đại học', subject: 'Marketing', image: 'Ảnh bìa' },
-  { id: 19, title: 'Luật dân sự', pages: 400, author: 'ThS. Ngô T', grade: 'Đại học', subject: 'Luật', image: 'Ảnh bìa' },
-  { id: 20, title: 'Toán lớp 7', pages: 170, author: 'Phan Văn U', grade: 'Lớp 7', subject: 'Toán', image: 'Ảnh bìa' }
-];
-
 const cardStyle = {
   background: '#b4cbe0',
   width: '100%',
@@ -108,36 +111,127 @@ export default function CategoryPage() {
   const { category } = useParams();
   const [selectedFilters, setSelectedFilters] = useState({});
   const [searchKeyword, setSearchKeyword] = useState('');
-  const [filteredDocs, setFilteredDocs] = useState(mockDocuments);
+  const [filteredDocs, setFilteredDocs] = useState([]);
+  const [allDocs, setAllDocs] = useState([]);
+  const [loading, setLoading] = useState(true);
   
   const defaultActive = categoryConfigs[category]?.sidebar.find(cat => cat.active)?.title || '';
   const [activeCategory, setActiveCategory] = useState(defaultActive);
+
+  // Fetch documents from backend
+  useEffect(() => {
+    const fetchDocuments = async () => {
+      setLoading(true);
+      try {
+        // Mapping từ URL sang tên category/tag thật
+        const categoryMap = {
+          'lop-1': 'Lớp 1', 'lop-2': 'Lớp 2', 'lop-3': 'Lớp 3',
+          'lop-4': 'Lớp 4', 'lop-5': 'Lớp 5', 'lop-6': 'Lớp 6',
+          'lop-7': 'Lớp 7', 'lop-8': 'Lớp 8', 'lop-9': 'Lớp 9',
+          'lop-10': 'Lớp 10', 'lop-11': 'Lớp 11', 'lop-12': 'Lớp 12',
+          'dai-hoc': 'Đại học', 'toan': 'Toán', 'van': 'Văn',
+          'tieng-anh': 'Tiếng Anh', 'vat-ly': 'Vật lý', 'hoa-hoc': 'Hóa học',
+          'sinh-hoc': 'Sinh học', 'lich-su': 'Lịch sử', 'dia-ly': 'Địa lý',
+          'tin-hoc': 'Tin học', 'gdcd': 'GDCD', 'lap-trinh': 'Lập trình',
+          'kinh-te': 'Kinh tế', 'luat': 'Luật', 'y-hoc': 'Y học',
+          'kien-truc': 'Kiến trúc', 'marketing': 'Marketing',
+          'tai-chinh': 'Tài chính', 'ke-toan': 'Kế toán'
+        };
+
+        const categoryName = categoryMap[category] || category;
+        
+        console.log('🔍 Đang tìm category:', categoryName);
+        
+        // Lấy TẤT CẢ tài liệu từ backend
+        const response = await fetch('http://localhost:5000/api/documents');
+        const allData = await response.json();
+        
+        console.log('📚 Tổng số tài liệu từ API:', allData.length);
+        
+        // Logic phân cấp: nếu là category cha (education, professional, etc.)
+        // thì hiển thị tất cả tài liệu có tags thuộc các category con
+        let filtered;
+        
+        if (categoryHierarchy[category]) {
+          // Đây là category cha (VD: education)
+          console.log('📂 Category cha, lấy tất cả tags con:', categoryHierarchy[category]);
+          
+          filtered = allData.filter(doc => {
+            // Kiểm tra category trùng với tên cha
+            const matchCategory = doc.category === categoryTitles[category];
+            
+            // Hoặc kiểm tra tags có chứa bất kỳ tag con nào
+            const matchTags = doc.tags && doc.tags.some(tag => 
+              categoryHierarchy[category].includes(tag)
+            );
+            
+            return matchCategory || matchTags;
+          });
+        } else {
+          // Đây là category con cụ thể (VD: Lớp 1)
+          console.log('📄 Category con chi tiết');
+          
+          filtered = allData.filter(doc => {
+            const matchCategory = doc.category === categoryName;
+            const matchTags = doc.tags && doc.tags.some(tag => tag === categoryName);
+            return matchCategory || matchTags;
+          });
+        }
+        
+        console.log('✅ Số tài liệu khớp:', filtered.length);
+        console.log('📄 Danh sách:', filtered.map(d => ({ 
+          title: d.title, 
+          category: d.category, 
+          tags: d.tags 
+        })));
+        
+        setAllDocs(filtered);
+        setFilteredDocs(filtered);
+      } catch (error) {
+        console.error('❌ Lỗi khi tải tài liệu:', error);
+        setAllDocs([]);
+        setFilteredDocs([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchDocuments();
+  }, [category]);
 
   const handleFilterChange = (key, value) => {
     setSelectedFilters(prev => ({ ...prev, [key]: value }));
   };
 
   const handleApply = () => {
-    let filtered = [...mockDocuments];
+    let filtered = [...allDocs];
     
+    // Filter theo tags
     if (selectedFilters.grade && selectedFilters.grade !== 'Tất cả') {
-      filtered = filtered.filter(doc => doc.grade === selectedFilters.grade);
+      filtered = filtered.filter(doc => 
+        doc.tags && doc.tags.includes(selectedFilters.grade)
+      );
     }
     
     if (selectedFilters.subject && selectedFilters.subject !== 'Tất cả') {
-      filtered = filtered.filter(doc => doc.subject === selectedFilters.subject);
+      filtered = filtered.filter(doc => 
+        doc.tags && doc.tags.includes(selectedFilters.subject)
+      );
     }
     
     if (selectedFilters.field && selectedFilters.field !== 'Tất cả') {
-      filtered = filtered.filter(doc => doc.subject === selectedFilters.field);
+      filtered = filtered.filter(doc => 
+        doc.tags && doc.tags.includes(selectedFilters.field)
+      );
     }
     
+    // Filter theo keyword
     if (searchKeyword.trim()) {
       const keyword = searchKeyword.toLowerCase();
       filtered = filtered.filter(doc => 
         doc.title.toLowerCase().includes(keyword) ||
-        doc.author.toLowerCase().includes(keyword) ||
-        doc.subject.toLowerCase().includes(keyword)
+        doc.description.toLowerCase().includes(keyword) ||
+        (doc.uploadedBy?.username && doc.uploadedBy.username.toLowerCase().includes(keyword))
       );
     }
     
@@ -152,13 +246,13 @@ export default function CategoryPage() {
     setActiveCategory(catTitle);
     setSelectedFilters({});
     setSearchKeyword('');
-    setFilteredDocs(mockDocuments);
+    setFilteredDocs(allDocs);
   };
 
   const handleClearFilters = () => {
     setSelectedFilters({});
     setSearchKeyword('');
-    setFilteredDocs(mockDocuments);
+    setFilteredDocs(allDocs);
   };
 
   return (
@@ -185,211 +279,255 @@ export default function CategoryPage() {
           onApply={handleApply}
         />
         
-        {categoryConfigs[category]?.sidebar ? (
-          <div style={{ display: 'flex', gap: '20px' }}>
-            <aside style={{
-              width: '220px',
-              flexShrink: 0,
-              background: '#fff',
-              borderRadius: '8px',
-              padding: '15px',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
-              height: 'fit-content',
-              position: 'sticky',
-              top: '150px'
-            }}>
-              {categoryConfigs[category].sidebar.map((cat, idx) => (
-                <div
-                  key={idx}
-                  onClick={() => handleSidebarChange(cat.title)}
-                  style={{
-                    padding: '12px 15px',
-                    marginBottom: '8px',
-                    borderRadius: '6px',
-                    cursor: 'pointer',
-                    background: activeCategory === cat.title ? '#e8f4f8' : 'transparent',
-                    color: activeCategory === cat.title ? '#133a5c' : '#2d4a67',
-                    fontWeight: activeCategory === cat.title ? 'bold' : 'normal',
-                    fontSize: '15px',
-                    transition: 'all 0.2s'
-                  }}
-                  onMouseEnter={(e) => {
-                    if (activeCategory !== cat.title) {
-                      e.target.style.background = '#f5f5f5';
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (activeCategory !== cat.title) {
-                      e.target.style.background = 'transparent';
-                    }
-                  }}
-                >
-                  {cat.title}
-                </div>
-              ))}
-            </aside>
-            
-            <div style={{ flex: 1 }}>
-              {/* Filter results info */}
-              <div style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                marginBottom: '20px',
-                padding: '15px',
-                background: '#f5f9fc',
-                borderRadius: '6px'
-              }}>
-                <div style={{ fontSize: '14px', color: '#2d4a67' }}>
-                  Tìm thấy <strong style={{ color: '#133a5c' }}>{filteredDocs.length}</strong> tài liệu
-                  {(Object.values(selectedFilters).some(v => v && v !== 'Tất cả') || searchKeyword) && (
-                    <span style={{ color: '#888' }}> (đã lọc)</span>
-                  )}
-                </div>
-                
-                {(Object.values(selectedFilters).some(v => v && v !== 'Tất cả') || searchKeyword) && (
-                  <button
-                    onClick={handleClearFilters}
-                    style={{
-                      padding: '8px 16px',
-                      background: '#fff',
-                      border: '1px solid #ccc',
-                      borderRadius: '6px',
-                      fontSize: '13px',
-                      cursor: 'pointer',
-                      color: '#2d4a67'
-                    }}
-                  >
-                    ✕ Xóa bộ lọc
-                  </button>
-                )}
-              </div>
-
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
-                gap: '20px'
-              }}>
-                {filteredDocs.map((doc) => (
-                  <Link
-                    to={`/document/${doc.id}`}
-                    key={doc.id}
-                    style={{
-                      textDecoration: 'none',
-                      color: 'inherit'
-                    }}
-                  >
-                    <div
-                      style={{
-                        background: '#fff',
-                        borderRadius: '7px',
-                        boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
-                        cursor: 'pointer',
-                        transition: 'transform 0.2s, box-shadow 0.2s'
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.transform = 'translateY(-4px)';
-                        e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.12)';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.transform = 'translateY(0)';
-                        e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.06)';
-                      }}
-                    >
-                      <div style={cardStyle}>
-                        {doc.image}
-                      </div>
-                      <div style={{ padding: '12px' }}>
-                        <div style={{
-                          fontWeight: 'bold',
-                          color: '#133a5c',
-                          fontSize: '14px',
-                          marginBottom: '8px'
-                        }}>
-                          {doc.title}
-                        </div>
-                        <div style={{
-                          fontSize: '12px',
-                          color: '#2d4a67',
-                          marginBottom: '4px'
-                        }}>
-                          Số trang: {doc.pages}
-                        </div>
-                        <div style={{
-                          fontSize: '11px',
-                          color: '#888'
-                        }}>
-                          Đăng tải bởi: {doc.author}
-                        </div>
-                      </div>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            </div>
+        {loading ? (
+          <div style={{ textAlign: 'center', padding: '60px', color: '#888' }}>
+            Đang tải tài liệu...
           </div>
         ) : (
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
-            gap: '20px'
-          }}>
-            {filteredDocs.slice(0, 12).map((doc) => (
-              <Link
-                to={`/document/${doc.id}`}
-                key={doc.id}
-                style={{
-                  textDecoration: 'none',
-                  color: 'inherit'
-                }}
-              >
-                <div
-                  style={{
-                    background: '#fff',
-                    borderRadius: '7px',
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
-                    cursor: 'pointer',
-                    transition: 'transform 0.2s, box-shadow 0.2s'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.transform = 'translateY(-4px)';
-                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.12)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.transform = 'translateY(0)';
-                    e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.06)';
-                  }}
-                >
-                  <div style={cardStyle}>
-                    {doc.image}
+          categoryConfigs[category]?.sidebar ? (
+            <div style={{ display: 'flex', gap: '20px' }}>
+              <aside style={{
+                width: '220px',
+                flexShrink: 0,
+                background: '#fff',
+                borderRadius: '8px',
+                padding: '15px',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+                height: 'fit-content',
+                position: 'sticky',
+                top: '150px'
+              }}>
+                {categoryConfigs[category].sidebar.map((cat, idx) => (
+                  <div
+                    key={idx}
+                    onClick={() => handleSidebarChange(cat.title)}
+                    style={{
+                      padding: '12px 15px',
+                      marginBottom: '8px',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      background: activeCategory === cat.title ? '#e8f4f8' : 'transparent',
+                      color: activeCategory === cat.title ? '#133a5c' : '#2d4a67',
+                      fontWeight: activeCategory === cat.title ? 'bold' : 'normal',
+                      fontSize: '15px',
+                      transition: 'all 0.2s'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (activeCategory !== cat.title) {
+                        e.target.style.background = '#f5f5f5';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (activeCategory !== cat.title) {
+                        e.target.style.background = 'transparent';
+                      }
+                    }}
+                  >
+                    {cat.title}
                   </div>
-                  <div style={{ padding: '12px' }}>
-                    <div style={{
-                      fontWeight: 'bold',
-                      color: '#133a5c',
-                      fontSize: '14px',
-                      marginBottom: '8px'
-                    }}>
-                      {doc.title}
-                    </div>
-                    <div style={{
-                      fontSize: '12px',
-                      color: '#2d4a67',
-                      marginBottom: '4px'
-                    }}>
-                      Số trang: {doc.pages}
-                    </div>
-                    <div style={{
-                      fontSize: '11px',
-                      color: '#888'
-                    }}>
-                      Đăng tải bởi: {doc.author}
-                    </div>
+                ))}
+              </aside>
+              
+              <div style={{ flex: 1 }}>
+                {/* Filter results info */}
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: '20px',
+                  padding: '15px',
+                  background: '#f5f9fc',
+                  borderRadius: '6px'
+                }}>
+                  <div style={{ fontSize: '14px', color: '#2d4a67' }}>
+                    Tìm thấy <strong style={{ color: '#133a5c' }}>{filteredDocs.length}</strong> tài liệu
+                    {(Object.values(selectedFilters).some(v => v && v !== 'Tất cả') || searchKeyword) && (
+                      <span style={{ color: '#888' }}> (đã lọc)</span>
+                    )}
                   </div>
+                  
+                  {(Object.values(selectedFilters).some(v => v && v !== 'Tất cả') || searchKeyword) && (
+                    <button
+                      onClick={handleClearFilters}
+                      style={{
+                        padding: '8px 16px',
+                        background: '#fff',
+                        border: '1px solid #ccc',
+                        borderRadius: '6px',
+                        fontSize: '13px',
+                        cursor: 'pointer',
+                        color: '#2d4a67'
+                      }}
+                    >
+                      ✕ Xóa bộ lọc
+                    </button>
+                  )}
                 </div>
-              </Link>
-            ))}
-          </div>
+
+                {filteredDocs.length === 0 ? (
+                  <div style={{
+                    textAlign: 'center',
+                    padding: '60px 20px',
+                    background: '#fff',
+                    borderRadius: '8px',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.06)'
+                  }}>
+                    <div style={{ fontSize: '50px', marginBottom: '15px' }}>📭</div>
+                    <h3 style={{ color: '#133a5c', marginBottom: '10px' }}>
+                      Chưa có tài liệu nào
+                    </h3>
+                    <p style={{ color: '#888' }}>
+                      Hãy là người đầu tiên chia sẻ tài liệu cho danh mục này!
+                    </p>
+                  </div>
+                ) : (
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+                    gap: '20px'
+                  }}>
+                    {filteredDocs.map((doc) => (
+                      <Link
+                        to={`/document/${doc._id}`}
+                        key={doc._id}
+                        style={{
+                          textDecoration: 'none',
+                          color: 'inherit'
+                        }}
+                      >
+                        <div
+                          style={{
+                            background: '#fff',
+                            borderRadius: '7px',
+                            boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+                            cursor: 'pointer',
+                            transition: 'transform 0.2s, box-shadow 0.2s'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.transform = 'translateY(-4px)';
+                            e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.12)';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.transform = 'translateY(0)';
+                            e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.06)';
+                          }}
+                        >
+                          <div style={cardStyle}>
+                            📄
+                          </div>
+                          <div style={{ padding: '12px' }}>
+                            <div style={{
+                              fontWeight: 'bold',
+                              color: '#133a5c',
+                              fontSize: '14px',
+                              marginBottom: '8px'
+                            }}>
+                              {doc.title}
+                            </div>
+                            <div style={{
+                              fontSize: '12px',
+                              color: '#2d4a67',
+                              marginBottom: '4px'
+                            }}>
+                              {doc.category}
+                            </div>
+                            <div style={{
+                              fontSize: '11px',
+                              color: '#888'
+                            }}>
+                              Đăng tải bởi: {doc.uploadedBy?.username || 'Unknown'}
+                            </div>
+                          </div>
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div>
+              {filteredDocs.length === 0 ? (
+                <div style={{
+                  textAlign: 'center',
+                  padding: '60px 20px',
+                  background: '#fff',
+                  borderRadius: '8px',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.06)'
+                }}>
+                  <div style={{ fontSize: '50px', marginBottom: '15px' }}>📭</div>
+                  <h3 style={{ color: '#133a5c', marginBottom: '10px' }}>
+                    Chưa có tài liệu nào
+                  </h3>
+                  <p style={{ color: '#888' }}>
+                    Hãy là người đầu tiên chia sẻ tài liệu cho danh mục này!
+                  </p>
+                </div>
+              ) : (
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
+                  gap: '20px'
+                }}>
+                  {filteredDocs.map((doc) => (
+                    <Link
+                      to={`/document/${doc._id}`}
+                      key={doc._id}
+                      style={{
+                        textDecoration: 'none',
+                        color: 'inherit'
+                      }}
+                    >
+                      <div
+                        style={{
+                          background: '#fff',
+                          borderRadius: '7px',
+                          boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+                          cursor: 'pointer',
+                          transition: 'transform 0.2s, box-shadow 0.2s'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.transform = 'translateY(-4px)';
+                          e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.12)';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.transform = 'translateY(0)';
+                          e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.06)';
+                        }}
+                      >
+                        <div style={cardStyle}>
+                          📄
+                        </div>
+                        <div style={{ padding: '12px' }}>
+                          <div style={{
+                            fontWeight: 'bold',
+                            color: '#133a5c',
+                            fontSize: '14px',
+                            marginBottom: '8px'
+                          }}>
+                            {doc.title}
+                          </div>
+                          <div style={{
+                            fontSize: '12px',
+                            color: '#2d4a67',
+                            marginBottom: '4px'
+                          }}>
+                            {doc.category}
+                          </div>
+                          <div style={{
+                            fontSize: '11px',
+                            color: '#888'
+                          }}>
+                            Đăng tải bởi: {doc.uploadedBy?.username || 'Unknown'}
+                          </div>
+                        </div>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
+          )
         )}
       </div>
     </div>
