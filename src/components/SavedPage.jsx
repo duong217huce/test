@@ -1,265 +1,104 @@
-import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
 import Header from './Header';
 
-// Mock data tài liệu đã lưu
-const mockSavedDocuments = [
-  {
-    id: 1,
-    title: 'Giáo trình Toán cao cấp A1',
-    pages: 245,
-    author: 'Nguyễn Văn A',
-    grade: 'Đại học',
-    subject: 'Toán',
-    savedDate: '15/11/2024',
-    image: 'Ảnh bìa tài liệu'
-  },
-  {
-    id: 2,
-    title: 'Vật lý đại cương',
-    pages: 180,
-    author: 'Trần Thị B',
-    grade: 'Đại học',
-    subject: 'Vật lý',
-    savedDate: '12/11/2024',
-    image: 'Ảnh bìa tài liệu'
-  },
-  {
-    id: 3,
-    title: 'Ngữ văn lớp 12',
-    pages: 320,
-    author: 'Lê Văn C',
-    grade: 'Lớp 12',
-    subject: 'Văn',
-    savedDate: '10/11/2024',
-    image: 'Ảnh bìa tài liệu'
-  },
-  {
-    id: 4,
-    title: 'Hóa học hữu cơ',
-    pages: 200,
-    author: 'Phạm Thị D',
-    grade: 'Lớp 11',
-    subject: 'Hóa học',
-    savedDate: '08/11/2024',
-    image: 'Ảnh bìa tài liệu'
-  },
-  {
-    id: 5,
-    title: 'Lập trình C++ cơ bản',
-    pages: 150,
-    author: 'Hoàng Văn E',
-    grade: 'Đại học',
-    subject: 'Lập trình',
-    savedDate: '05/11/2024',
-    image: 'Ảnh bìa tài liệu'
-  }
-];
-
-const cardStyle = {
-  background: '#b4cbe0',
-  width: '100%',
-  height: '180px',
-  borderRadius: '7px 7px 0 0',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  color: '#fff',
-  fontSize: '14px'
-};
-
 export default function SavedPage() {
-  const [savedDocs, setSavedDocs] = useState(mockSavedDocuments);
-  const [filter, setFilter] = useState('all'); // all, recent, oldest
+  const navigate = useNavigate();
+  const [savedDocuments, setSavedDocuments] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
 
-  const handleRemove = (docId) => {
-    if (window.confirm('Bạn có chắc muốn xóa tài liệu này khỏi danh sách đã lưu?')) {
-      setSavedDocs(savedDocs.filter(doc => doc.id !== docId));
-      alert('Đã xóa tài liệu khỏi danh sách');
+  useEffect(() => {
+    const loggedIn = localStorage.getItem('isLoggedIn') === 'true';
+    setIsLoggedIn(loggedIn);
+
+    if (!loggedIn) {
+      alert('Vui lòng đăng nhập để xem tài liệu đã lưu!');
+      navigate('/login');
+      return;
+    }
+
+    fetchSavedDocuments();
+  }, []);
+
+  const fetchSavedDocuments = async () => {
+    setLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch('http://localhost:5000/api/users/saved', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (res.ok) {
+        const data = await res.json();
+        setSavedDocuments(data);
+        console.log('📚 Saved documents loaded:', data.length);
+      } else {
+        console.error('❌ Error fetching saved documents');
+        setSavedDocuments([]);
+      }
+    } catch (err) {
+      console.error('❌ Error:', err);
+      setSavedDocuments([]);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleSort = (sortType) => {
-    setFilter(sortType);
-    let sorted = [...savedDocs];
-    
-    if (sortType === 'recent') {
-      // Sort by date (newest first) - mock sorting
-      sorted.reverse();
-    } else if (sortType === 'oldest') {
-      // Sort by date (oldest first)
-      sorted.sort((a, b) => a.id - b.id);
+  const handleUnsave = async (docId) => {
+    if (!window.confirm('Bạn có chắc muốn bỏ lưu tài liệu này?')) return;
+
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`http://localhost:5000/api/users/saved/${docId}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (res.ok) {
+        // Refresh danh sách
+        fetchSavedDocuments();
+      }
+    } catch (err) {
+      console.error('❌ Error unsaving document:', err);
     }
-    
-    setSavedDocs(sorted);
   };
+
+  if (!isLoggedIn) {
+    return null;
+  }
 
   return (
     <div style={{ minHeight: '100vh', background: '#fffffe', fontFamily: 'Arial, sans-serif' }}>
       <Header />
       <div style={{ height: '130px' }}></div>
-      
-      <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '20px' }}>
-        {/* Page Header */}
-        <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: '30px'
-        }}>
-          <div>
-            <h1 style={{
-              color: '#133a5c',
-              fontSize: '28px',
-              marginBottom: '8px',
-              fontWeight: 'bold'
-            }}>
-              Tài liệu đã lưu
-            </h1>
-            <p style={{
-              color: '#888',
-              fontSize: '14px'
-            }}>
-              {savedDocs.length} tài liệu
-            </p>
-          </div>
 
-          {/* Sort options */}
-          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-            <span style={{ fontSize: '14px', color: '#888' }}>Sắp xếp:</span>
-            <select
-              value={filter}
-              onChange={(e) => handleSort(e.target.value)}
-              style={{
-                padding: '8px 12px',
-                fontSize: '14px',
-                border: '1px solid #ccc',
-                borderRadius: '6px',
-                outline: 'none',
-                cursor: 'pointer',
-                background: '#fff'
-              }}
-            >
-              <option value="all">Tất cả</option>
-              <option value="recent">Mới nhất</option>
-              <option value="oldest">Cũ nhất</option>
-            </select>
-          </div>
-        </div>
+      <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '40px 20px' }}>
+        <h2 style={{ color: '#133a5c', marginBottom: '10px', fontSize: '28px' }}>
+          🔖 Tài liệu đã lưu
+        </h2>
+        <p style={{ color: '#666', marginBottom: '30px' }}>
+          {loading ? 'Đang tải...' : `Bạn có ${savedDocuments.length} tài liệu đã lưu`}
+        </p>
 
-        {/* Documents Grid */}
-        {savedDocs.length > 0 ? (
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
-            gap: '20px'
-          }}>
-            {savedDocs.map((doc) => (
-              <div
-                key={doc.id}
-                style={{
-                  position: 'relative',
-                  background: '#fff',
-                  borderRadius: '7px',
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
-                  transition: 'transform 0.2s, box-shadow 0.2s'
-                }}
-              >
-                {/* Remove button */}
-                <button
-                  onClick={(e) => {
-                    e.preventDefault();
-                    handleRemove(doc.id);
-                  }}
-                  style={{
-                    position: 'absolute',
-                    top: '10px',
-                    right: '10px',
-                    background: 'rgba(255, 255, 255, 0.9)',
-                    border: 'none',
-                    borderRadius: '50%',
-                    width: '30px',
-                    height: '30px',
-                    cursor: 'pointer',
-                    fontSize: '18px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    zIndex: 10,
-                    color: '#e84c61',
-                    boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-                  }}
-                  title="Xóa khỏi danh sách"
-                >
-                  ×
-                </button>
-
-                <Link
-                  to={`/document/${doc.id}`}
-                  style={{
-                    textDecoration: 'none',
-                    color: 'inherit',
-                    display: 'block'
-                  }}
-                >
-                  <div style={cardStyle}>
-                    {doc.image}
-                  </div>
-                  <div style={{ padding: '12px' }}>
-                    <div style={{
-                      fontWeight: 'bold',
-                      color: '#133a5c',
-                      fontSize: '14px',
-                      marginBottom: '8px',
-                      lineHeight: '1.3'
-                    }}>
-                      {doc.title}
-                    </div>
-                    <div style={{
-                      fontSize: '12px',
-                      color: '#2d4a67',
-                      marginBottom: '4px'
-                    }}>
-                      <span style={{ color: '#888' }}>Số trang:</span> {doc.pages}
-                    </div>
-                    <div style={{
-                      fontSize: '12px',
-                      color: '#2d4a67',
-                      marginBottom: '4px'
-                    }}>
-                      <span style={{ color: '#888' }}>Cấp học:</span> {doc.grade}
-                    </div>
-                    <div style={{
-                      fontSize: '11px',
-                      color: '#888',
-                      marginTop: '8px',
-                      paddingTop: '8px',
-                      borderTop: '1px solid #eee'
-                    }}>
-                      Lưu ngày: {doc.savedDate}
-                    </div>
-                  </div>
-                </Link>
-              </div>
-            ))}
+        {loading ? (
+          <div style={{ textAlign: 'center', padding: '60px', color: '#888' }}>
+            Đang tải...
           </div>
-        ) : (
-          // Empty state
-          <div style={{
-            textAlign: 'center',
-            padding: '80px 20px',
-            background: '#fff',
-            borderRadius: '8px',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.06)'
-          }}>
-            <div style={{ fontSize: '60px', marginBottom: '20px' }}>📚</div>
-            <h3 style={{ color: '#133a5c', marginBottom: '10px' }}>
+        ) : savedDocuments.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '60px' }}>
+            <div style={{ fontSize: '64px', marginBottom: '20px' }}>📭</div>
+            <h3 style={{ color: '#666', marginBottom: '10px' }}>
               Chưa có tài liệu nào được lưu
             </h3>
             <p style={{ color: '#888', marginBottom: '20px' }}>
-              Bắt đầu lưu các tài liệu yêu thích để xem sau
+              Lưu tài liệu yêu thích để dễ dàng truy cập sau này
             </p>
-            <Link
+            <Link 
               to="/"
               style={{
                 display: 'inline-block',
@@ -273,6 +112,105 @@ export default function SavedPage() {
             >
               Khám phá tài liệu
             </Link>
+          </div>
+        ) : (
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
+            gap: '20px'
+          }}>
+            {savedDocuments.map((doc) => (
+              <div
+                key={doc._id}
+                style={{
+                  background: '#fff',
+                  borderRadius: '12px',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+                  overflow: 'hidden',
+                  position: 'relative'
+                }}
+              >
+                <Link 
+                  to={`/document/${doc._id}`}
+                  style={{ textDecoration: 'none', color: 'inherit' }}
+                >
+                  <div style={{
+                    background: 'linear-gradient(135deg, #b4cbe0 0%, #8eb4d4 100%)',
+                    width: '100%',
+                    height: '180px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '48px'
+                  }}>
+                    📚
+                  </div>
+                  <div style={{ padding: '15px' }}>
+                    <div style={{ 
+                      fontWeight: 'bold', 
+                      color: '#133a5c', 
+                      marginBottom: '10px', 
+                      fontSize: '15px',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap'
+                    }}>
+                      {doc.title}
+                    </div>
+                    <div style={{ fontSize: '12px', color: '#888', marginBottom: '6px' }}>
+                      📁 {doc.category}
+                    </div>
+                    <div style={{ fontSize: '11px', color: '#888', marginBottom: '8px' }}>
+                      👤 {(doc.uploadedBy && doc.uploadedBy.username) || 'Ẩn danh'}
+                    </div>
+                    <div style={{ 
+                      display: 'flex', 
+                      justifyContent: 'space-between', 
+                      alignItems: 'center',
+                      paddingTop: '8px',
+                      borderTop: '1px solid #eee'
+                    }}>
+                      <div style={{ fontSize: '12px', color: '#ff8c00', fontWeight: 'bold' }}>
+                        ⭐ {doc.averageRating || "0"}
+                      </div>
+                      <div style={{ fontSize: '12px', color: '#666' }}>
+                        👁️ {doc.views || 0}
+                      </div>
+                    </div>
+                  </div>
+                </Link>
+                
+                {/* Nút bỏ lưu */}
+                <button
+                  onClick={(e) => {
+                    e.preventDefault();
+                    handleUnsave(doc._id);
+                  }}
+                  style={{
+                    position: 'absolute',
+                    top: '10px',
+                    right: '10px',
+                    background: 'rgba(255,255,255,0.9)',
+                    border: 'none',
+                    borderRadius: '50%',
+                    width: '35px',
+                    height: '35px',
+                    cursor: 'pointer',
+                    fontSize: '18px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
+                    transition: 'transform 0.2s'
+                  }}
+                  onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.1)'}
+                  onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}
+                  title="Bỏ lưu"
+                >
+                  ❌
+                </button>
+              </div>
+            ))}
           </div>
         )}
       </div>

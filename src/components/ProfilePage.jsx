@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import Header from './Header';
 
@@ -14,6 +14,15 @@ const cardStyle = {
   fontSize: '14px'
 };
 
+const hocCapList = [
+  '',
+  'Tiểu học',
+  'THCS',
+  'THPT',
+  'Đại học',
+  'Sau đại học'
+];
+
 export default function ProfilePage() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('info');
@@ -27,11 +36,15 @@ export default function ProfilePage() {
     totalDownloads: 0,
     totalViews: 0,
     bio: '',
-    avatar: null
+    avatar: '',
+    hocCap: '',
+    lop: '',
+    chuyenNganh: ''
   });
   const [uploadedDocs, setUploadedDocs] = useState([]);
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(true);
+  const fileInputRef = useRef(null);
 
   useEffect(() => {
     // Check if user is logged in
@@ -41,26 +54,24 @@ export default function ProfilePage() {
       navigate('/login');
       return;
     }
-
     // Get user data from localStorage
     const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
-    const storedUsername = localStorage.getItem('username');
-    const storedFullName = localStorage.getItem('fullName');
-    
+    const avatar = localStorage.getItem('avatarUrl') || '';
     setUserData({
-      username: storedUsername || storedUser.username || '',
-      fullName: storedFullName || storedUser.fullName || '',
+      username: localStorage.getItem('username') || storedUser.username || '',
+      fullName: localStorage.getItem('fullName') || storedUser.fullName || '',
       email: storedUser.email || '',
       phone: localStorage.getItem('phone') || '',
       joinDate: new Date(storedUser.createdAt || Date.now()).toLocaleDateString('vi-VN'),
       totalUploads: 0,
       totalDownloads: 0,
       totalViews: 0,
-      bio: 'Thành viên của EDUCONNECT',
-      avatar: null
+      bio: storedUser.bio || 'Thành viên của EDUCONNECT',
+      avatar: avatar,
+      hocCap: localStorage.getItem('hocCap') || '',
+      lop: localStorage.getItem('lop') || '',
+      chuyenNganh: localStorage.getItem('chuyenNganh') || ''
     });
-
-    // Fetch uploaded documents
     fetchUploadedDocs();
   }, [navigate]);
 
@@ -69,61 +80,65 @@ export default function ProfilePage() {
     try {
       const token = localStorage.getItem('token');
       const user = JSON.parse(localStorage.getItem('user') || '{}');
-      
-      if (!token || !user.id) {
+      if (!token || !(user._id || user.id)) {
         setUploadedDocs([]);
         setLoading(false);
         return;
       }
-
       const response = await fetch('http://localhost:5000/api/documents', {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
+        headers: { Authorization: `Bearer ${token}` }
       });
-      
       const allDocs = await response.json();
-      
-      // Filter documents uploaded by current user
-      const myDocs = allDocs.filter(doc => 
-        doc.uploadedBy && (doc.uploadedBy._id === user.id || doc.uploadedBy === user.id)
+      const myDocs = allDocs.filter(doc =>
+        doc.uploadedBy && (doc.uploadedBy._id === user._id || doc.uploadedBy === user.id)
       );
-      
       setUploadedDocs(myDocs);
-      
-      // Update stats
-      const totalDownloads = myDocs.reduce((sum, doc) => sum + (doc.downloads || 0), 0);
-      const totalViews = myDocs.reduce((sum, doc) => sum + (doc.views || 0), 0);
-      
       setUserData(prev => ({
         ...prev,
         totalUploads: myDocs.length,
-        totalDownloads,
-        totalViews
+        totalDownloads: myDocs.reduce((sum, doc) => sum + (doc.downloads || 0), 0),
+        totalViews: myDocs.reduce((sum, doc) => sum + (doc.views || 0), 0)
       }));
-    } catch (error) {
-      console.error('Lỗi khi tải tài liệu:', error);
+    } catch {
       setUploadedDocs([]);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleEdit = () => {
-    setIsEditing(!isEditing);
-    if (isEditing) {
-      alert('Đã lưu thông tin cá nhân');
+  // Ảnh đại diện
+  const handleAvatarChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = evt => {
+        setUserData(prev => ({ ...prev, avatar: evt.target.result }));
+      };
+      reader.readAsDataURL(file);
     }
+  };
+
+  // Lưu thông tin sửa đổi
+  const handleEdit = () => {
+    if (isEditing) {
+      // Lưu về localStorage (hoặc gọi API nếu backend support)
+      localStorage.setItem('fullName', userData.fullName);
+      localStorage.setItem('avatarUrl', userData.avatar || '');
+      localStorage.setItem('hocCap', userData.hocCap);
+      localStorage.setItem('lop', userData.lop);
+      localStorage.setItem('chuyenNganh', userData.chuyenNganh);
+      alert('Đã lưu thông tin hồ sơ!');
+    }
+    setIsEditing(val => !val);
   };
 
   return (
     <div style={{ minHeight: '100vh', background: '#fffffe', fontFamily: 'Arial, sans-serif' }}>
       <Header />
       <div style={{ height: '130px' }}></div>
-      
       <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '20px' }}>
         <div style={{ display: 'flex', gap: '30px' }}>
-          {/* Left sidebar - User info card */}
+          {/* SIDEBAR */}
           <aside style={{
             width: '300px',
             flexShrink: 0
@@ -148,31 +163,32 @@ export default function ProfilePage() {
                 alignItems: 'center',
                 justifyContent: 'center',
                 fontSize: '48px',
-                color: '#fff'
+                color: '#fff',
+                overflow: 'hidden'
               }}>
-                {userData.avatar ? (
-                  <img src={userData.avatar} alt="Avatar" style={{ width: '100%', height: '100%', borderRadius: '50%' }} />
-                ) : (
-                  '👤'
-                )}
+                {userData.avatar ?
+                  (<img src={userData.avatar} alt="Avatar" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />)
+                  : "👤"}
               </div>
-
+              {/* Chỉnh ảnh đại diện */}
+              {isEditing &&
+                <div style={{ marginBottom: 15 }}>
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    accept="image/*"
+                    style={{ display: 'block', margin: '0 auto' }}
+                    onChange={handleAvatarChange}
+                  />
+                </div>
+              }
               {/* User name */}
-              <h2 style={{
-                color: '#133a5c',
-                fontSize: '22px',
-                marginBottom: '5px'
-              }}>
+              <h2 style={{ color: '#133a5c', fontSize: '22px', marginBottom: '5px' }}>
                 {userData.fullName || userData.username}
               </h2>
-              <p style={{
-                color: '#888',
-                fontSize: '14px',
-                marginBottom: '20px'
-              }}>
+              <p style={{ color: '#888', fontSize: '14px', marginBottom: '20px' }}>
                 @{userData.username}
               </p>
-
               {/* Stats */}
               <div style={{
                 display: 'flex',
@@ -201,7 +217,6 @@ export default function ProfilePage() {
                   <div style={{ fontSize: '12px', color: '#888' }}>Lượt xem</div>
                 </div>
               </div>
-
               {/* Member since */}
               <p style={{
                 fontSize: '13px',
@@ -210,7 +225,6 @@ export default function ProfilePage() {
               }}>
                 Tham gia: {userData.joinDate}
               </p>
-
               {/* Edit button */}
               <button
                 onClick={handleEdit}
@@ -231,10 +245,8 @@ export default function ProfilePage() {
               </button>
             </div>
           </aside>
-
-          {/* Main content */}
+          {/* MAIN CONTENT */}
           <div style={{ flex: 1 }}>
-            {/* Tabs */}
             <div style={{
               display: 'flex',
               gap: '20px',
@@ -247,7 +259,8 @@ export default function ProfilePage() {
                   padding: '12px 24px',
                   background: 'none',
                   border: 'none',
-                  borderBottom: activeTab === 'info' ? '3px solid #4ba3d6' : '3px solid transparent',
+                  borderBottom: activeTab === 'info' ?
+                    '3px solid #4ba3d6' : '3px solid transparent',
                   color: activeTab === 'info' ? '#133a5c' : '#888',
                   fontSize: '16px',
                   fontWeight: activeTab === 'info' ? 'bold' : 'normal',
@@ -263,7 +276,8 @@ export default function ProfilePage() {
                   padding: '12px 24px',
                   background: 'none',
                   border: 'none',
-                  borderBottom: activeTab === 'uploads' ? '3px solid #4ba3d6' : '3px solid transparent',
+                  borderBottom: activeTab === 'uploads' ?
+                    '3px solid #4ba3d6' : '3px solid transparent',
                   color: activeTab === 'uploads' ? '#133a5c' : '#888',
                   fontSize: '16px',
                   fontWeight: activeTab === 'uploads' ? 'bold' : 'normal',
@@ -274,10 +288,8 @@ export default function ProfilePage() {
                 Tài liệu đã tải lên ({uploadedDocs.length})
               </button>
             </div>
-
-            {/* Tab content */}
+            {/* TAB CONTENT */}
             {activeTab === 'info' ? (
-              // Personal info tab
               <div style={{
                 background: '#fff',
                 borderRadius: '8px',
@@ -285,12 +297,82 @@ export default function ProfilePage() {
                 boxShadow: '0 2px 8px rgba(0,0,0,0.06)'
               }}>
                 <h3 style={{ color: '#133a5c', marginBottom: '20px' }}>Thông tin cá nhân</h3>
-                
-                <InfoField label="Tên đăng nhập" value={userData.username} isEditing={false} />
-                <InfoField label="Họ và tên" value={userData.fullName} isEditing={isEditing} />
-                <InfoField label="Email" value={userData.email} isEditing={isEditing} />
-                <InfoField label="Số điện thoại" value={userData.phone} isEditing={isEditing} />
-                
+                <InfoField
+                  label="Tên đăng nhập"
+                  value={userData.username}
+                  isEditing={false}
+                />
+                <InfoField
+                  label="Họ và tên"
+                  value={userData.fullName}
+                  isEditing={isEditing}
+                  onChange={val => setUserData(prev => ({ ...prev, fullName: val }))}
+                />
+                <InfoField
+                  label="Email"
+                  value={userData.email}
+                  isEditing={isEditing}
+                  onChange={val => setUserData(prev => ({ ...prev, email: val }))}
+                />
+                <InfoField
+                  label="Số điện thoại"
+                  value={userData.phone}
+                  isEditing={isEditing}
+                  onChange={val => setUserData(prev => ({ ...prev, phone: val }))}
+                />
+                {/* Thông tin học tập */}
+                <div style={{ marginBottom: '20px' }}>
+                  <label style={{
+                    display: 'block',
+                    marginBottom: '8px',
+                    color: '#133a5c',
+                    fontSize: '14px',
+                    fontWeight: '500'
+                  }}>Cấp học</label>
+                  {isEditing ? (
+                    <select
+                      value={userData.hocCap}
+                      onChange={e => setUserData(prev => ({ ...prev, hocCap: e.target.value }))}
+                      style={{
+                        width: '100%',
+                        padding: '12px',
+                        fontSize: '14px',
+                        border: '1px solid #ccc',
+                        borderRadius: '6px',
+                        outline: 'none'
+                      }}
+                    >
+                      {hocCapList.map(option => (
+                        <option key={option} value={option}>{option === '' ? '--Chọn--' : option}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <div style={{
+                      padding: '12px',
+                      background: '#f5f5f5',
+                      borderRadius: '6px',
+                      color: '#2d4a67',
+                      fontSize: '14px'
+                    }}>
+                      {userData.hocCap || 'Chưa cập nhật'}
+                    </div>
+                  )}
+                </div>
+                <InfoField
+                  label="Lớp"
+                  value={userData.lop}
+                  isEditing={isEditing}
+                  onChange={val => setUserData(prev => ({ ...prev, lop: val }))}
+                  placeholder="Nhập lớp đang học"
+                />
+                <InfoField
+                  label="Chuyên ngành"
+                  value={userData.chuyenNganh}
+                  isEditing={isEditing}
+                  onChange={val => setUserData(prev => ({ ...prev, chuyenNganh: val }))}
+                  placeholder="Nếu bạn là sinh viên"
+                />
+                {/* Bio */}
                 <div style={{ marginTop: '20px' }}>
                   <label style={{
                     display: 'block',
@@ -305,6 +387,7 @@ export default function ProfilePage() {
                     <textarea
                       defaultValue={userData.bio}
                       rows="4"
+                      onChange={e => setUserData(prev => ({ ...prev, bio: e.target.value }))}
                       style={{
                         width: '100%',
                         padding: '12px',
@@ -325,12 +408,9 @@ export default function ProfilePage() {
                 </div>
               </div>
             ) : (
-              // Uploads tab
               <div>
                 {loading ? (
-                  <div style={{ textAlign: 'center', padding: '60px', color: '#888' }}>
-                    Đang tải tài liệu...
-                  </div>
+                  <div style={{ textAlign: 'center', padding: '60px', color: '#888' }}>Đang tải tài liệu...</div>
                 ) : uploadedDocs.length > 0 ? (
                   <div style={{
                     display: 'grid',
@@ -354,18 +434,16 @@ export default function ProfilePage() {
                             cursor: 'pointer',
                             transition: 'transform 0.2s, box-shadow 0.2s'
                           }}
-                          onMouseEnter={(e) => {
+                          onMouseEnter={e => {
                             e.currentTarget.style.transform = 'translateY(-4px)';
                             e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.12)';
                           }}
-                          onMouseLeave={(e) => {
+                          onMouseLeave={e => {
                             e.currentTarget.style.transform = 'translateY(0)';
                             e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.06)';
                           }}
                         >
-                          <div style={cardStyle}>
-                            📄
-                          </div>
+                          <div style={cardStyle}>📄</div>
                           <div style={{ padding: '15px' }}>
                             <div style={{
                               fontWeight: 'bold',
@@ -373,14 +451,10 @@ export default function ProfilePage() {
                               fontSize: '15px',
                               marginBottom: '10px',
                               lineHeight: '1.3'
-                            }}>
-                              {doc.title}
-                            </div>
-                            
+                            }}>{doc.title}</div>
                             <div style={{ fontSize: '12px', color: '#2d4a67', marginBottom: '8px' }}>
                               <span style={{ color: '#888' }}>📊</span> {doc.downloads || 0} lượt tải • {doc.views || 0} lượt xem
                             </div>
-                            
                             <div style={{
                               fontSize: '11px',
                               color: '#888',
@@ -434,8 +508,8 @@ export default function ProfilePage() {
   );
 }
 
-// Helper component for info fields
-function InfoField({ label, value, isEditing }) {
+// Helper
+function InfoField({ label, value, isEditing, onChange = () => { }, placeholder }) {
   return (
     <div style={{ marginBottom: '20px' }}>
       <label style={{
@@ -451,6 +525,8 @@ function InfoField({ label, value, isEditing }) {
         <input
           type="text"
           defaultValue={value}
+          placeholder={placeholder || ''}
+          onChange={e => onChange(e.target.value)}
           style={{
             width: '100%',
             padding: '12px',
@@ -469,7 +545,7 @@ function InfoField({ label, value, isEditing }) {
           color: '#2d4a67',
           fontSize: '14px'
         }}>
-          {value}
+          {value || 'Chưa cập nhật'}
         </div>
       )}
     </div>

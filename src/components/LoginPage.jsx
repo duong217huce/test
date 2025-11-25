@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 
 export default function LoginPage() {
@@ -28,11 +28,11 @@ export default function LoginPage() {
     if (username === adminUser && password === adminPass) {
       localStorage.setItem('isLoggedIn', 'true');
       localStorage.setItem('username', username);
-      localStorage.setItem('userId', 'admin-local-id'); // ✅ Thêm userId cho admin
-      localStorage.setItem('role', 'admin'); // ✅ Thêm role
+      localStorage.setItem('userId', 'admin-local-id');
+      localStorage.setItem('userRole', 'admin');
       localStorage.setItem('isAdmin', 'true');
       localStorage.setItem('fullName', 'Admin');
-      localStorage.setItem('userPoints', '999999');
+      localStorage.setItem('userCoins', '999999');
       alert('Đăng nhập admin thành công!');
       navigate('/');
       window.location.reload();
@@ -54,25 +54,28 @@ export default function LoginPage() {
       const data = await response.json();
 
       if (response.ok) {
-        // Lưu token và thông tin user
-        localStorage.setItem('token', data.token);
-        localStorage.setItem('isLoggedIn', 'true');
-        localStorage.setItem('username', data.user.username);
-        localStorage.setItem('userId', data.user.id); // ✅ Thêm userId
-        localStorage.setItem('role', data.user.role); // ✅ Thêm role
-        localStorage.setItem('fullName', data.user.fullName);
-        localStorage.setItem('isAdmin', data.user.role === 'admin' ? 'true' : 'false');
-        localStorage.setItem('userPoints', data.user.documentPoints.toString());
-        localStorage.setItem('user', JSON.stringify(data.user));
+        // ✅ KIỂM TRA data trước khi dùng
+        console.log('✅ Login response:', data);
 
-        alert(`Chào mừng ${data.user.fullName}!`);
+        // Lưu token và thông tin user
+        localStorage.setItem('token', data.token || '');
+        localStorage.setItem('isLoggedIn', 'true');
+        localStorage.setItem('username', data.user?.username || '');
+        localStorage.setItem('userId', data.user?._id || ''); // ✅ Sửa từ id → _id
+        localStorage.setItem('userRole', data.user?.role || 'user'); // ✅ Sửa từ role → userRole
+        localStorage.setItem('fullName', data.user?.fullName || '');
+        localStorage.setItem('isAdmin', (data.user?.role === 'admin').toString());
+        localStorage.setItem('userCoins', (data.user?.coins || 0).toString()); // ✅ Sửa từ documentPoints → coins
+        localStorage.setItem('user', JSON.stringify(data.user || {}));
+
+        alert(`Chào mừng ${data.user?.fullName || data.user?.username}!`);
         navigate('/');
         window.location.reload();
       } else {
         setError(data.message || 'Đăng nhập thất bại!');
       }
     } catch (error) {
-      console.error('Lỗi:', error);
+      console.error('❌ Login error:', error);
       setError('Không thể kết nối đến server!');
     } finally {
       setLoading(false);
