@@ -1,12 +1,12 @@
 const mongoose = require('mongoose');
 
 const ratingSchema = new mongoose.Schema({
-  documentId: {
+  document: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Document',
     required: true
   },
-  userId: {
+  user: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     required: true
@@ -22,5 +22,8 @@ const ratingSchema = new mongoose.Schema({
     default: Date.now
   }
 });
+
+// Index để tránh user đánh giá nhiều lần
+ratingSchema.index({ document: 1, user: 1 }, { unique: true });
 
 module.exports = mongoose.model('Rating', ratingSchema);

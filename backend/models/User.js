@@ -4,33 +4,30 @@ const userSchema = new mongoose.Schema({
   username: {
     type: String,
     required: true,
-    unique: true,
-    trim: true
+    unique: true
   },
   email: {
     type: String,
     required: true,
-    unique: true,
-    trim: true,
-    lowercase: true
+    unique: true
   },
   password: {
     type: String,
     required: true
   },
   fullName: {
-    type: String,
-    required: true
+    type: String
   },
   role: {
     type: String,
     enum: ['user', 'admin'],
     default: 'user'
   },
-  documentPoints: {
+  coins: {
     type: Number,
     default: 0
   },
+  // ✅ THÊM: Danh sách tài liệu đã lưu
   savedDocuments: [{
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Document'

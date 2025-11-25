@@ -3,7 +3,7 @@ const router = express.Router();
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
-const mammoth = require('mammoth'); // ✅ Thêm dòng này
+const mammoth = require('mammoth');
 const Document = require('../models/Document');
 const auth = require('../middleware/auth');
 
@@ -70,6 +70,40 @@ router.get('/', async (req, res) => {
   }
 });
 
+router.get('/search', async (req, res) => {
+  try {
+    const { q, limit } = req.query;
+    
+    if (!q || q.trim() === '') {
+      return res.json([]);
+    }
+
+    // Tìm kiếm theo title, description, tags, category
+    const searchRegex = new RegExp(q, 'i'); // 'i' = case insensitive
+    
+    const documents = await Document.find({
+      $or: [
+        { title: searchRegex },
+        { description: searchRegex },
+        { tags: searchRegex },
+        { category: searchRegex }
+      ]
+    })
+    .populate('uploadedBy', 'username fullName')
+    .limit(parseInt(limit) || 10)
+    .sort({ uploadDate: -1 })
+    .select('title description category uploadDate views downloads fileType');
+
+    console.log(`🔍 Search query: "${q}" - Found ${documents.length} results`);
+    
+    res.json(documents);
+  } catch (error) {
+    console.error('❌ Error searching documents:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+
 // @route   GET /api/documents/:id
 // @desc    Get single document by ID
 // @access  Public
@@ -98,9 +132,9 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// ✅ @route   GET /api/documents/:id/preview
-// ✅ @desc    Convert DOCX to HTML for preview
-// ✅ @access  Public
+// @route   GET /api/documents/:id/preview
+// @desc    Convert DOCX to HTML for preview
+// @access  Public
 router.get('/:id/preview', async (req, res) => {
   try {
     const document = await Document.findById(req.params.id);
@@ -265,23 +299,29 @@ router.post('/', auth, upload.single('file'), async (req, res) => {
   }
 });
 
+// ========== CHỈNH SỬA TÀI LIỆU (MỚI) ==========
 // @route   PUT /api/documents/:id
-// @desc    Update a document
-// @access  Private
-router.put('/:id', auth, async (req, res) => {
+// @desc    Update a document (title, description, and optionally replace file)
+// @access  Private (Owner or Admin only)
+router.put('/:id', auth, upload.single('file'), async (req, res) => {
   try {
     const document = await Document.findById(req.params.id);
     
     if (!document) {
-      return res.status(404).json({ message: 'Document not found' });
+      return res.status(404).json({ message: 'Không tìm thấy tài liệu' });
     }
 
-    if (document.uploadedBy && document.uploadedBy.toString() !== req.user.id && req.user.role !== 'admin') {
-      return res.status(403).json({ message: 'Not authorized' });
+    // Kiểm tra quyền: chỉ người đăng hoặc admin
+    const isOwner = document.uploadedBy && document.uploadedBy.toString() === req.user.id;
+    const isAdmin = req.user.role === 'admin';
+
+    if (!isOwner && !isAdmin) {
+      return res.status(403).json({ message: 'Bạn không có quyền chỉnh sửa tài liệu này' });
     }
 
     const { title, description, category, tags, isPaid, price } = req.body;
 
+    // Cập nhật thông tin cơ bản
     if (title) document.title = title;
     if (description) document.description = description;
     if (category) document.category = category;
@@ -291,12 +331,51 @@ router.put('/:id', auth, async (req, res) => {
     if (isPaid !== undefined) document.isPaid = isPaid;
     if (price !== undefined) document.price = price;
 
-    await document.save();
+    // Nếu có file mới được upload, xóa file cũ và cập nhật
+    if (req.file) {
+      // Xóa file cũ
+      if (document.fileUrl) {
+        const oldFilename = path.basename(document.fileUrl);
+        const oldFilePath = path.join(uploadsDir, oldFilename);
+        
+        if (fs.existsSync(oldFilePath)) {
+          try {
+            fs.unlinkSync(oldFilePath);
+            console.log('🗑️ Đã xóa file cũ:', oldFilename);
+          } catch (err) {
+            console.error('⚠️ Không thể xóa file cũ:', err.message);
+          }
+        }
+      }
 
-    res.json({ message: 'Document updated successfully', document });
+      // Cập nhật thông tin file mới
+      document.fileUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
+      document.fileType = req.file.mimetype;
+      document.fileSize = req.file.size;
+      
+      console.log('📎 File mới đã được thay thế:', req.file.filename);
+    }
+
+    await document.save();
+    console.log('✅ Tài liệu đã được cập nhật:', document._id);
+
+    res.json({ 
+      message: 'Cập nhật tài liệu thành công', 
+      document 
+    });
+
   } catch (error) {
     console.error('❌ Error updating document:', error);
-    res.status(500).json({ message: 'Server error', error: error.message });
+    
+    // Nếu có lỗi và đã upload file mới, xóa file đó đi
+    if (req.file && fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
+    }
+    
+    res.status(500).json({ 
+      message: 'Lỗi server khi cập nhật tài liệu', 
+      error: error.message 
+    });
   }
 });
 
@@ -336,7 +415,7 @@ router.delete('/:id', auth, async (req, res) => {
 // @route   POST /api/documents/:id/download
 // @desc    Increase download count
 // @access  Public
-router.post('/:id/download', async (req, res) => {
+router.post('/:id/download', auth, async (req, res) => {
   try {
     const document = await Document.findById(req.params.id);
     
@@ -344,12 +423,16 @@ router.post('/:id/download', async (req, res) => {
       return res.status(404).json({ message: 'Document not found' });
     }
 
+    // Tăng số lượt download
     document.downloads += 1;
     await document.save();
 
     console.log('📥 Download count increased for:', document.title);
 
-    res.json({ message: 'Download count updated', downloads: document.downloads });
+    res.json({ 
+      message: 'Download count updated', 
+      downloads: document.downloads 
+    });
   } catch (error) {
     console.error('❌ Error updating download count:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
