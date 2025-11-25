@@ -9,6 +9,7 @@ import LoginPage from './components/LoginPage';
 import RegisterPage from './components/RegisterPage';
 import SavedPage from './components/SavedPage';
 import Chatbot from './components/Chatbot';
+import SearchPage from './components/SearchPage';  
 
 function App() {
   return (
@@ -37,6 +38,9 @@ function App() {
         
         {/* Trang tài liệu đã lưu */}
         <Route path="/saved" element={<SavedPage />} />
+
+        {/* Trang tìm kiếm */}
+        <Route path="/search" element={<SearchPage />} />
       </Routes>
       
       {/* ✅ Chatbot nổi - hiển thị trên TẤT CẢ các trang */}
