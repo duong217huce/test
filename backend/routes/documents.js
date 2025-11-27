@@ -4,19 +4,33 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const mammoth = require('mammoth');
+const { promisify } = require('util');
+const { exec } = require('child_process');
+const execPromise = promisify(exec);
 const Document = require('../models/Document');
+const User = require('../models/User');
 const auth = require('../middleware/auth');
 
 // Tạo thư mục uploads nếu chưa tồn tại
 const uploadsDir = path.join(__dirname, '../uploads');
+const coversDir = path.join(__dirname, '../uploads/covers');
+
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
+}
+
+if (!fs.existsSync(coversDir)) {
+  fs.mkdirSync(coversDir, { recursive: true });
 }
 
 // Cấu hình multer để lưu file
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    cb(null, uploadsDir);
+    if (file.fieldname === 'coverImage') {
+      cb(null, coversDir);
+    } else {
+      cb(null, uploadsDir);
+    }
   },
   filename: function (req, file, cb) {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
@@ -30,14 +44,26 @@ const upload = multer({
     fileSize: 50 * 1024 * 1024 // 50MB
   },
   fileFilter: function (req, file, cb) {
-    const allowedTypes = /pdf|doc|docx|ppt|pptx|xls|xlsx|txt/;
-    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
-    const mimetype = allowedTypes.test(file.mimetype);
-
-    if (mimetype && extname) {
-      return cb(null, true);
+    if (file.fieldname === 'coverImage') {
+      const allowedImageTypes = /jpeg|jpg|png|gif/;
+      const extname = allowedImageTypes.test(path.extname(file.originalname).toLowerCase());
+      const mimetype = allowedImageTypes.test(file.mimetype);
+      
+      if (mimetype && extname) {
+        return cb(null, true);
+      } else {
+        cb(new Error('Chỉ chấp nhận ảnh: JPG, PNG, GIF'));
+      }
     } else {
-      cb(new Error('Chỉ chấp nhận file: PDF, DOC, DOCX, PPT, PPTX, XLS, XLSX, TXT'));
+      const allowedTypes = /pdf|doc|docx|ppt|pptx|xls|xlsx|txt/;
+      const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+      const mimetype = allowedTypes.test(file.mimetype);
+
+      if (mimetype && extname) {
+        return cb(null, true);
+      } else {
+        cb(new Error('Chỉ chấp nhận file: PDF, DOC, DOCX, PPT, PPTX, XLS, XLSX, TXT'));
+      }
     }
   }
 });
@@ -70,6 +96,9 @@ router.get('/', async (req, res) => {
   }
 });
 
+// @route   GET /api/documents/search
+// @desc    Search documents
+// @access  Public
 router.get('/search', async (req, res) => {
   try {
     const { q, limit } = req.query;
@@ -78,8 +107,7 @@ router.get('/search', async (req, res) => {
       return res.json([]);
     }
 
-    // Tìm kiếm theo title, description, tags, category
-    const searchRegex = new RegExp(q, 'i'); // 'i' = case insensitive
+    const searchRegex = new RegExp(q, 'i');
     
     const documents = await Document.find({
       $or: [
@@ -92,7 +120,7 @@ router.get('/search', async (req, res) => {
     .populate('uploadedBy', 'username fullName')
     .limit(parseInt(limit) || 10)
     .sort({ uploadDate: -1 })
-    .select('title description category uploadDate views downloads fileType');
+    .select('title description category uploadDate views downloads fileType isPaid price coverImage');
 
     console.log(`🔍 Search query: "${q}" - Found ${documents.length} results`);
     
@@ -102,7 +130,6 @@ router.get('/search', async (req, res) => {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 });
-
 
 // @route   GET /api/documents/:id
 // @desc    Get single document by ID
@@ -143,13 +170,11 @@ router.get('/:id/preview', async (req, res) => {
       return res.status(404).json({ message: 'Document not found' });
     }
 
-    // Chỉ convert file Word
     const fileType = document.fileType || '';
     if (!fileType.includes('word') && !fileType.includes('document')) {
       return res.status(400).json({ message: 'Only Word documents supported' });
     }
 
-    // Lấy đường dẫn file
     const filename = path.basename(document.fileUrl);
     const filePath = path.join(uploadsDir, filename);
 
@@ -159,11 +184,9 @@ router.get('/:id/preview', async (req, res) => {
 
     console.log('📄 Converting DOCX to HTML:', filename);
 
-    // Convert DOCX sang HTML
     const result = await mammoth.convertToHtml({ path: filePath });
     const html = result.value;
 
-    // Trả về HTML với styling
     const styledHtml = `
       <!DOCTYPE html>
       <html>
@@ -239,18 +262,28 @@ router.get('/:id/preview', async (req, res) => {
 // @route   POST /api/documents
 // @desc    Upload a new document
 // @access  Private
-router.post('/', auth, upload.single('file'), async (req, res) => {
+router.post('/', auth, upload.fields([
+  { name: 'file', maxCount: 1 },
+  { name: 'coverImage', maxCount: 1 }
+]), async (req, res) => {
   try {
-    if (!req.file) {
+    if (!req.files || !req.files.file) {
       return res.status(400).json({ message: 'No file uploaded' });
     }
 
-    const { title, description, category, tags, isPaid, price } = req.body;
+    const documentFile = req.files.file[0];
+    const coverImageFile = req.files.coverImage ? req.files.coverImage[0] : null;
 
-    const fileUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
+    const { title, description, category, tags } = req.body;
+    const fileUrl = `${req.protocol}://${req.get('host')}/uploads/${documentFile.filename}`;
     
-    console.log('📤 Upload request from user:', req.user?.id || 'GUEST');
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({ message: 'User not authenticated' });
+    }
+    
+    console.log('📤 Upload request from user:', req.user.id);
     console.log('📄 File URL:', fileUrl);
+    console.log('📦 File size:', documentFile.size, 'bytes');
     
     let tagsArray = [];
     if (tags) {
@@ -261,28 +294,62 @@ router.post('/', auth, upload.single('file'), async (req, res) => {
       }
     }
 
+    // ✅ XỬ LÝ ẢNH BÌA
+    let coverImageUrl = null;
+
+    if (coverImageFile) {
+      // User đã upload ảnh bìa
+      coverImageUrl = `${req.protocol}://${req.get('host')}/uploads/covers/${coverImageFile.filename}`;
+      console.log('🖼️ User uploaded cover:', coverImageFile.filename);
+    } else if (documentFile.mimetype === 'application/pdf') {
+      // ✅ TỰ ĐỘNG TẠO ẢNH BÌA TỪ PDF
+      try {
+        const pdfPath = documentFile.path;
+        const outputFilename = `cover-${Date.now()}.jpg`;
+        const outputBasePath = path.join(coversDir, outputFilename.replace('.jpg', ''));
+
+        console.log('🔄 Generating cover from PDF...');
+        const command = `pdftoppm -f 1 -l 1 -jpeg -singlefile "${pdfPath}" "${outputBasePath}"`;
+        
+        await execPromise(command);
+        
+        coverImageUrl = `${req.protocol}://${req.get('host')}/uploads/covers/${outputFilename}`;
+        console.log('✅ Auto-generated cover:', outputFilename);
+      } catch (error) {
+        console.error('⚠️ PDF cover generation failed:', error.message);
+      }
+    } else {
+      console.log('📄 Non-PDF file without cover');
+    }
+
+    // ✅ TỰ ĐỘNG XÁC ĐỊNH TÀI LIỆU TRẢ PHÍ (>= 4MB)
+    const FOUR_MB = 4 * 1024 * 1024;
+    const isPaid = documentFile.size >= FOUR_MB;
+    const price = isPaid ? 10 : 0;
+
+    console.log(`💰 Document type: ${isPaid ? 'PAID' : 'FREE'} (${(documentFile.size / (1024 * 1024)).toFixed(2)} MB)`);
+
     const newDocument = new Document({
       title,
       description,
       category,
       fileUrl,
-      fileType: req.file.mimetype,
-      fileSize: req.file.size,
-      uploadedBy: req.user?.id || null,
+      coverImage: coverImageUrl,
+      fileType: documentFile.mimetype,
+      fileSize: documentFile.size,
+      uploadedBy: req.user.id,
       tags: tagsArray,
-      isPaid: isPaid === 'true' || isPaid === true,
-      price: price ? parseInt(price) : 0
+      isPaid: isPaid,
+      price: price
     });
 
     const savedDocument = await newDocument.save();
     console.log('✅ Document saved:', savedDocument._id);
 
-    if (req.user?.id) {
-      const User = require('../models/User');
-      await User.findByIdAndUpdate(req.user.id, {
-        $inc: { documentPoints: 10 }
-      });
-    }
+    // Thưởng điểm cho người upload
+    await User.findByIdAndUpdate(req.user.id, {
+      $inc: { coins: 10 }
+    });
 
     res.status(201).json({
       message: 'Document uploaded successfully',
@@ -291,17 +358,21 @@ router.post('/', auth, upload.single('file'), async (req, res) => {
   } catch (error) {
     console.error('❌ Error uploading document:', error);
     
-    if (req.file && fs.existsSync(req.file.path)) {
-      fs.unlinkSync(req.file.path);
+    if (req.files) {
+      if (req.files.file && fs.existsSync(req.files.file[0].path)) {
+        fs.unlinkSync(req.files.file[0].path);
+      }
+      if (req.files.coverImage && fs.existsSync(req.files.coverImage[0].path)) {
+        fs.unlinkSync(req.files.coverImage[0].path);
+      }
     }
     
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 });
 
-// ========== CHỈNH SỬA TÀI LIỆU (MỚI) ==========
 // @route   PUT /api/documents/:id
-// @desc    Update a document (title, description, and optionally replace file)
+// @desc    Update a document
 // @access  Private (Owner or Admin only)
 router.put('/:id', auth, upload.single('file'), async (req, res) => {
   try {
@@ -311,7 +382,6 @@ router.put('/:id', auth, upload.single('file'), async (req, res) => {
       return res.status(404).json({ message: 'Không tìm thấy tài liệu' });
     }
 
-    // Kiểm tra quyền: chỉ người đăng hoặc admin
     const isOwner = document.uploadedBy && document.uploadedBy.toString() === req.user.id;
     const isAdmin = req.user.role === 'admin';
 
@@ -319,21 +389,16 @@ router.put('/:id', auth, upload.single('file'), async (req, res) => {
       return res.status(403).json({ message: 'Bạn không có quyền chỉnh sửa tài liệu này' });
     }
 
-    const { title, description, category, tags, isPaid, price } = req.body;
+    const { title, description, category, tags } = req.body;
 
-    // Cập nhật thông tin cơ bản
     if (title) document.title = title;
     if (description) document.description = description;
     if (category) document.category = category;
     if (tags) {
       document.tags = Array.isArray(tags) ? tags : tags.split(',').map(t => t.trim());
     }
-    if (isPaid !== undefined) document.isPaid = isPaid;
-    if (price !== undefined) document.price = price;
 
-    // Nếu có file mới được upload, xóa file cũ và cập nhật
     if (req.file) {
-      // Xóa file cũ
       if (document.fileUrl) {
         const oldFilename = path.basename(document.fileUrl);
         const oldFilePath = path.join(uploadsDir, oldFilename);
@@ -348,10 +413,14 @@ router.put('/:id', auth, upload.single('file'), async (req, res) => {
         }
       }
 
-      // Cập nhật thông tin file mới
       document.fileUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
       document.fileType = req.file.mimetype;
       document.fileSize = req.file.size;
+
+      // ✅ Cập nhật lại isPaid và price dựa trên fileSize mới
+      const FOUR_MB = 4 * 1024 * 1024;
+      document.isPaid = req.file.size >= FOUR_MB;
+      document.price = document.isPaid ? 10 : 0;
       
       console.log('📎 File mới đã được thay thế:', req.file.filename);
     }
@@ -367,7 +436,6 @@ router.put('/:id', auth, upload.single('file'), async (req, res) => {
   } catch (error) {
     console.error('❌ Error updating document:', error);
     
-    // Nếu có lỗi và đã upload file mới, xóa file đó đi
     if (req.file && fs.existsSync(req.file.path)) {
       fs.unlinkSync(req.file.path);
     }
@@ -402,6 +470,16 @@ router.delete('/:id', auth, async (req, res) => {
       console.log('🗑️ Deleted file:', filename);
     }
 
+    // Xóa ảnh bìa nếu có
+    if (document.coverImage) {
+      const coverFilename = path.basename(document.coverImage);
+      const coverPath = path.join(coversDir, coverFilename);
+      if (fs.existsSync(coverPath)) {
+        fs.unlinkSync(coverPath);
+        console.log('🗑️ Deleted cover:', coverFilename);
+      }
+    }
+
     await Document.findByIdAndDelete(req.params.id);
     console.log('✅ Document deleted:', req.params.id);
 
@@ -414,13 +492,28 @@ router.delete('/:id', auth, async (req, res) => {
 
 // @route   POST /api/documents/:id/download
 // @desc    Increase download count
-// @access  Public
+// @access  Private
 router.post('/:id/download', auth, async (req, res) => {
   try {
     const document = await Document.findById(req.params.id);
     
     if (!document) {
       return res.status(404).json({ message: 'Document not found' });
+    }
+
+    // ✅ KIỂM TRA TÀI LIỆU TRẢ PHÍ
+    if (document.isPaid) {
+      const user = await User.findById(req.user.id);
+      
+      // Kiểm tra đã mua chưa
+      if (!user.purchasedDocuments.includes(req.params.id)) {
+        return res.status(403).json({ 
+          message: 'Vui lòng mua tài liệu để tải xuống',
+          isPaid: true,
+          price: document.price,
+          needPurchase: true
+        });
+      }
     }
 
     // Tăng số lượt download
@@ -431,11 +524,104 @@ router.post('/:id/download', auth, async (req, res) => {
 
     res.json({ 
       message: 'Download count updated', 
-      downloads: document.downloads 
+      downloads: document.downloads,
+      fileUrl: document.fileUrl
     });
   } catch (error) {
     console.error('❌ Error updating download count:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+// ============ CHỨC NĂNG TÀI LIỆU TRẢ PHÍ ============
+
+// @route   POST /api/documents/:id/purchase
+// @desc    Mua tài liệu trả phí
+// @access  Private
+router.post('/:id/purchase', auth, async (req, res) => {
+  try {
+    const documentId = req.params.id;
+    const userId = req.user.id;
+
+    const document = await Document.findById(documentId);
+    if (!document) {
+      return res.status(404).json({ message: 'Tài liệu không tồn tại' });
+    }
+
+    if (!document.isPaid) {
+      return res.status(400).json({ message: 'Tài liệu này miễn phí' });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: 'User không tồn tại' });
+    }
+
+    // Kiểm tra đã mua chưa
+    if (user.purchasedDocuments.includes(documentId)) {
+      return res.json({ 
+        success: true,
+        message: 'Bạn đã mua tài liệu này rồi',
+        alreadyPurchased: true 
+      });
+    }
+
+    // Kiểm tra số dư
+    if (user.coins < document.price) {
+      return res.status(400).json({ 
+        message: 'Số dư không đủ',
+        required: document.price,
+        current: user.coins,
+        needRecharge: true
+      });
+    }
+
+    // Trừ tiền và thêm vào danh sách đã mua
+    user.coins -= document.price;
+    user.purchasedDocuments.push(documentId);
+    await user.save();
+
+    // Cộng tiền cho người upload (nếu khác người mua)
+    if (document.uploadedBy.toString() !== userId) {
+      await User.findByIdAndUpdate(
+        document.uploadedBy,
+        { $inc: { coins: document.price } }
+      );
+      console.log(`💰 Cộng ${document.price} DP cho người upload`);
+    }
+
+    console.log(`✅ User ${user.username} purchased document ${document.title}`);
+
+    res.json({
+      success: true,
+      message: 'Mua tài liệu thành công!',
+      remainingCoins: user.coins,
+      document: {
+        id: document._id,
+        title: document.title
+      }
+    });
+  } catch (error) {
+    console.error('❌ Error purchasing document:', error);
+    res.status(500).json({ message: 'Lỗi server', error: error.message });
+  }
+});
+
+// @route   GET /api/documents/:id/check-purchase
+// @desc    Kiểm tra user đã mua tài liệu chưa
+// @access  Private
+router.get('/:id/check-purchase', auth, async (req, res) => {
+  try {
+    const documentId = req.params.id;
+    const userId = req.user.id;
+
+    const user = await User.findById(userId);
+    const isPurchased = user.purchasedDocuments.includes(documentId);
+
+    res.json({ isPurchased });
+  } catch (error) {
+    console.error('❌ Error checking purchase:', error);
+    res.status(500).json({ message: 'Lỗi server', error: error.message });
   }
 });
 
