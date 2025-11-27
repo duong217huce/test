@@ -46,6 +46,11 @@ exports.uploadDocument = async (req, res) => {
     if (!req.file) {
       return res.status(400).json({ message: 'Vui lòng upload file' });
     }
+
+    // ✅ KIỂM TRA: Đảm bảo req.userId tồn tại
+    if (!req.userId) {
+      return res.status(401).json({ message: 'Người dùng chưa xác thực' });
+    }
     
     const document = new Document({
       title,
@@ -56,7 +61,7 @@ exports.uploadDocument = async (req, res) => {
       price: isPaid ? price : 0,
       isPaid,
       tags: tags ? tags.split(',') : [],
-      uploadedBy: req.userId,
+      uploadedBy: req.userId,  // ✅ BẮT BUỘC phải có
       fileUrl: req.file.path
     });
     
@@ -77,6 +82,7 @@ exports.uploadDocument = async (req, res) => {
     
     res.status(201).json(document);
   } catch (error) {
+    console.error('❌ Upload error:', error);
     res.status(500).json({ message: error.message });
   }
 };
