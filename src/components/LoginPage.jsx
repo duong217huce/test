@@ -9,7 +9,6 @@ export default function LoginPage() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Khởi tạo admin account mặc định trong localStorage
     if (!localStorage.getItem('adminInitialized')) {
       localStorage.setItem('adminUsername', 'admin');
       localStorage.setItem('adminPassword', '123');
@@ -21,7 +20,6 @@ export default function LoginPage() {
     e.preventDefault();
     setError('');
 
-    // Kiểm tra admin login (local)
     const adminUser = localStorage.getItem('adminUsername') || 'admin';
     const adminPass = localStorage.getItem('adminPassword') || '123';
 
@@ -33,42 +31,61 @@ export default function LoginPage() {
       localStorage.setItem('isAdmin', 'true');
       localStorage.setItem('fullName', 'Admin');
       localStorage.setItem('userCoins', '999999');
+      
+      const adminUserObj = {
+        _id: 'admin-local-id',
+        id: 'admin-local-id',
+        username: username,
+        fullName: 'Admin',
+        role: 'admin',
+        coins: 999999
+      };
+      localStorage.setItem('user', JSON.stringify(adminUserObj));
+      
       alert('Đăng nhập admin thành công!');
       navigate('/');
       window.location.reload();
       return;
     }
 
-    // Đăng nhập thông qua backend API
     setLoading(true);
 
     try {
       const response = await fetch('http://localhost:5000/api/auth/login', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password })
       });
 
       const data = await response.json();
 
       if (response.ok) {
-        // ✅ KIỂM TRA data trước khi dùng
         console.log('✅ Login response:', data);
 
-        // Lưu token và thông tin user
+        if (!data.user) {
+          setError('Dữ liệu người dùng không hợp lệ!');
+          return;
+        }
+
+        // ✅ LƯU TOKEN
         localStorage.setItem('token', data.token || '');
         localStorage.setItem('isLoggedIn', 'true');
-        localStorage.setItem('username', data.user?.username || '');
-        localStorage.setItem('userId', data.user?._id || ''); // ✅ Sửa từ id → _id
-        localStorage.setItem('userRole', data.user?.role || 'user'); // ✅ Sửa từ role → userRole
-        localStorage.setItem('fullName', data.user?.fullName || '');
-        localStorage.setItem('isAdmin', (data.user?.role === 'admin').toString());
-        localStorage.setItem('userCoins', (data.user?.coins || 0).toString()); // ✅ Sửa từ documentPoints → coins
-        localStorage.setItem('user', JSON.stringify(data.user || {}));
+        
+        // ✅ LƯU THÔNG TIN CƠ BẢN
+        localStorage.setItem('username', data.user.username || '');
+        localStorage.setItem('userId', data.user.id || data.user._id || '');
+        localStorage.setItem('userRole', data.user.role || 'user');
+        localStorage.setItem('isAdmin', (data.user.role === 'admin').toString());
+        localStorage.setItem('fullName', data.user.fullName || '');
+        localStorage.setItem('userCoins', (data.user.coins || 0).toString());
+        
+        // ✅ LƯU TOÀN BỘ OBJECT USER (quan trọng nhất!)
+        localStorage.setItem('user', JSON.stringify(data.user));
 
-        alert(`Chào mừng ${data.user?.fullName || data.user?.username}!`);
+        console.log('✅ User data saved to localStorage');
+        console.log('📦 User object:', data.user);
+
+        alert(`Chào mừng ${data.user.fullName || data.user.username}!`);
         navigate('/');
         window.location.reload();
       } else {

@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Header from './Header';
+import { refreshUserData } from '../utils/userUtils';
 
 const gradeOptions = [
   'Lớp 1', 'Lớp 2', 'Lớp 3', 'Lớp 4', 'Lớp 5',
@@ -9,9 +10,17 @@ const gradeOptions = [
   'Đại học'
 ];
 
-const subjectOptions = [
+// Môn học cơ bản (Lớp 1-5)
+const basicSubjects = ['Toán', 'Văn', 'Tiếng Anh', 'Lịch sử', 'Địa lý'];
+
+// Môn học THCS/THPT (Lớp 6-12)
+const advancedSubjects = [
   'Toán', 'Văn', 'Tiếng Anh', 'Vật lý', 'Hóa học', 'Sinh học',
-  'Lịch sử', 'Địa lý', 'Tin học', 'GDCD',
+  'Lịch sử', 'Địa lý', 'Tin học', 'GDCD'
+];
+
+// Lĩnh vực chuyên môn (Chỉ Đại học)
+const professionalSubjects = [
   'Lập trình', 'Kinh tế', 'Luật', 'Y học', 
   'Kiến trúc', 'Marketing', 'Tài chính', 'Kế toán'
 ];
@@ -21,19 +30,63 @@ export default function UploadPage() {
   const [formData, setFormData] = useState({
     title: '',
     description: '',
-    isPrivate: false,
     file: null,
+    coverImage: null, // ✅ THÊM
     grade: '',
     subject: ''
   });
   const [uploading, setUploading] = useState(false);
+  const [availableSubjects, setAvailableSubjects] = useState([]);
+  const [coverPreview, setCoverPreview] = useState(null); // ✅ THÊM
+
+  // ✅ Cập nhật danh sách môn học khi thay đổi cấp học
+  useEffect(() => {
+    if (!formData.grade) {
+      setAvailableSubjects([]);
+      return;
+    }
+
+    const gradeNumber = parseInt(formData.grade.replace('Lớp ', ''));
+
+    if (formData.grade === 'Đại học') {
+      // Đại học: hiển thị tất cả
+      setAvailableSubjects([...advancedSubjects, ...professionalSubjects]);
+    } else if (gradeNumber >= 1 && gradeNumber <= 5) {
+      // Lớp 1-5: chỉ môn cơ bản
+      setAvailableSubjects(basicSubjects);
+      // Nếu đã chọn môn không hợp lệ, reset
+      if (formData.subject && !basicSubjects.includes(formData.subject)) {
+        setFormData(prev => ({ ...prev, subject: '' }));
+      }
+    } else if (gradeNumber >= 6 && gradeNumber <= 12) {
+      // Lớp 6-12: môn nâng cao
+      setAvailableSubjects(advancedSubjects);
+      // Nếu đã chọn môn chuyên môn, reset
+      if (formData.subject && professionalSubjects.includes(formData.subject)) {
+        setFormData(prev => ({ ...prev, subject: '' }));
+      }
+    }
+  }, [formData.grade]);
+
+  // ✅ Kiểm tra khi chọn môn học chuyên môn → tự động set Đại học
+  const handleSubjectChange = (e) => {
+    const selectedSubject = e.target.value;
+    
+    if (professionalSubjects.includes(selectedSubject)) {
+      // Nếu chọn môn chuyên môn → tự động chọn Đại học
+      setFormData(prev => ({
+        ...prev,
+        subject: selectedSubject,
+        grade: 'Đại học'
+      }));
+    } else {
+      setFormData(prev => ({ ...prev, subject: selectedSubject }));
+    }
+  };
 
   const handleInputChange = (e) => {
-    const { name, value, type, checked } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: type === 'checkbox' ? checked : value
-    }));
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
   };
 
   const handleSelectChange = (e) => {
@@ -45,6 +98,33 @@ export default function UploadPage() {
     const file = e.target.files[0];
     if (file) {
       setFormData(prev => ({ ...prev, file }));
+    }
+  };
+
+  // ✅ THÊM: Xử lý upload ảnh bìa
+  const handleCoverImageChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      // Kiểm tra file có phải ảnh không
+      if (!file.type.startsWith('image/')) {
+        alert('Vui lòng chọn file ảnh!');
+        return;
+      }
+      
+      // Kiểm tra kích thước (tối đa 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        alert('Kích thước ảnh không được vượt quá 5MB!');
+        return;
+      }
+
+      setFormData(prev => ({ ...prev, coverImage: file }));
+
+      // Preview ảnh
+      const reader = new FileReader();
+      reader.onload = (evt) => {
+        setCoverPreview(evt.target.result);
+      };
+      reader.readAsDataURL(file);
     }
   };
 
@@ -82,7 +162,7 @@ export default function UploadPage() {
       formData.subject
     ].filter(Boolean).join(' - ');
 
-    // Tạo form data để gửi file (multipart/form-data)
+    // Tạo form data
     const apiData = new FormData();
     apiData.append('title', formData.title);
     apiData.append('description', formData.description);
@@ -93,8 +173,12 @@ export default function UploadPage() {
     apiData.append('isPaid', false);
     apiData.append('price', 0);
     apiData.append('file', formData.file);
+    
+    // ✅ THÊM: Upload ảnh bìa
+    if (formData.coverImage) {
+      apiData.append('coverImage', formData.coverImage);
+    }
 
-    // Lấy token từ localStorage
     const token = localStorage.getItem('token');
 
     if (!token) {
@@ -117,13 +201,15 @@ export default function UploadPage() {
       const data = await response.json();
 
       if (response.ok) {
-        alert(`Tài liệu đã được upload thành công!\nDanh mục: ${selectedInfo}\n\nBạn nhận được 10 DP!`);
+        // ✅ SỬ DỤNG HELPER ĐỂ CẬP NHẬT DP
+        await refreshUserData();
         
-        // Cập nhật điểm trong localStorage
-        const currentPoints = parseInt(localStorage.getItem('userPoints') || '0');
-        localStorage.setItem('userPoints', (currentPoints + 10).toString());
+        const newCoins = parseInt(localStorage.getItem('userCoins') || '0');
+        
+        alert(`Tài liệu đã được upload thành công!\nDanh mục: ${selectedInfo}\n\n✅ Bạn nhận được 10 DP!\nSố dư hiện tại: ${newCoins} DP`);
         
         navigate('/');
+        window.location.reload(); // Reload để cập nhật Header
       } else {
         alert(data.message || 'Upload thất bại!');
       }
@@ -176,7 +262,7 @@ export default function UploadPage() {
               name="title"
               value={formData.title}
               onChange={handleInputChange}
-              placeholder="ChungChiTCVN_6476_2024"
+              placeholder="VD: Giáo trình Toán lớp 12 - Chương 1"
               required
               style={{
                 width: '100%',
@@ -220,6 +306,76 @@ export default function UploadPage() {
                 boxSizing: 'border-box'
               }}
             />
+          </div>
+
+          {/* ✅ THÊM: Upload ảnh bìa */}
+          <div style={{ marginBottom: '25px' }}>
+            <label style={{
+              display: 'block',
+              marginBottom: '8px',
+              color: '#133a5c',
+              fontSize: '15px',
+              fontWeight: 'normal'
+            }}>
+              Ảnh bìa tài liệu <span style={{ color: '#888', fontSize: '13px' }}>(Không bắt buộc)</span>
+            </label>
+            
+            <div style={{ display: 'flex', gap: '20px', alignItems: 'flex-start' }}>
+              {/* Preview ảnh */}
+              {coverPreview && (
+                <div style={{
+                  width: '200px',
+                  height: '280px',
+                  border: '2px solid #4ba3d6',
+                  borderRadius: '8px',
+                  overflow: 'hidden',
+                  flexShrink: 0
+                }}>
+                  <img 
+                    src={coverPreview} 
+                    alt="Preview" 
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'cover'
+                    }}
+                  />
+                </div>
+              )}
+
+              {/* Upload button */}
+              <div style={{ flex: 1 }}>
+                <input
+                  id="coverImageInput"
+                  type="file"
+                  onChange={handleCoverImageChange}
+                  accept="image/*"
+                  style={{ display: 'none' }}
+                />
+                <button
+                  type="button"
+                  onClick={() => document.getElementById('coverImageInput').click()}
+                  style={{
+                    padding: '12px 24px',
+                    background: '#4ba3d6',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: '6px',
+                    fontSize: '14px',
+                    fontWeight: 'bold',
+                    cursor: 'pointer',
+                    marginBottom: '10px'
+                  }}
+                >
+                  {coverPreview ? '📷 Thay đổi ảnh bìa' : '📷 Chọn ảnh bìa'}
+                </button>
+                <div style={{ fontSize: '12px', color: '#888', marginTop: '8px' }}>
+                  • Định dạng: JPG, PNG, GIF<br/>
+                  • Kích thước tối đa: 5MB<br/>
+                  • Tỷ lệ đề xuất: 2:3 (VD: 400x600px)
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* Cấp học và Môn học */}
@@ -278,7 +434,8 @@ export default function UploadPage() {
                 <select
                   name="subject"
                   value={formData.subject}
-                  onChange={handleSelectChange}
+                  onChange={handleSubjectChange}
+                  disabled={!formData.grade}
                   style={{
                     width: '100%',
                     padding: '12px',
@@ -286,14 +443,16 @@ export default function UploadPage() {
                     border: '1px solid #ccc',
                     borderRadius: '6px',
                     outline: 'none',
-                    background: '#fff',
-                    cursor: 'pointer',
+                    background: formData.grade ? '#fff' : '#f5f5f5',
+                    cursor: formData.grade ? 'pointer' : 'not-allowed',
                     color: formData.subject ? '#133a5c' : '#999',
                     boxSizing: 'border-box'
                   }}
                 >
-                  <option value="" disabled>Chọn môn học/lĩnh vực</option>
-                  {subjectOptions.map(subject => (
+                  <option value="" disabled>
+                    {formData.grade ? 'Chọn môn học/lĩnh vực' : 'Vui lòng chọn cấp học trước'}
+                  </option>
+                  {availableSubjects.map(subject => (
                     <option key={subject} value={subject}>{subject}</option>
                   ))}
                 </select>
@@ -322,7 +481,7 @@ export default function UploadPage() {
               color: '#888',
               marginTop: '8px'
             }}>
-              * Phải chọn ít nhất 1 trong 2 mục
+              💡 Lưu ý: Lớp 1-5 chỉ hiển thị môn cơ bản. Môn chuyên môn chỉ dành cho Đại học.
             </div>
           </div>
 
@@ -402,7 +561,7 @@ export default function UploadPage() {
                       marginBottom: '12px'
                     }}
                   >
-                    Upload thêm tài liệu
+                    Upload tài liệu
                   </button>
                   <div style={{
                     fontSize: '13px',

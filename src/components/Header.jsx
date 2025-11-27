@@ -355,7 +355,7 @@ export default function Header() {
           ) : (
             isLoggedIn && (
               <div 
-                onClick={() => alert('Tính năng nạp điểm đang được phát triển!')}
+                onClick={() => navigate('/recharge')}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -369,17 +369,18 @@ export default function Header() {
                   whiteSpace: 'nowrap'
                 }}
                 onMouseOver={(e) => {
-                  e.currentTarget.style.background = '#ffecb3';
+                  e.currentTarget.style.background = '#ffc107';
                   e.currentTarget.style.transform = 'scale(1.05)';
                 }}
                 onMouseOut={(e) => {
                   e.currentTarget.style.background = '#fff3cd';
                   e.currentTarget.style.transform = 'scale(1)';
                 }}
+                title="Nhấn để nạp tiền"
               >
                 <span style={{ fontSize: '16px' }}>🪙</span>
-                <span style={{ fontWeight: 'bold', color: '#ff8c00', fontSize: '14px' }}>
-                  {userCoins} dp
+                <span style={{ fontWeight: 'bold', color: '#856404', fontSize: '14px' }}>
+                  {userCoins} DP
                 </span>
               </div>
             )

@@ -1,6 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect,useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import Header from './Header';
+import PurchaseModal from './PurchaseModal';
+import { refreshUserData } from '../utils/userUtils';
 
 export default function DocumentDetailPage() {
   const { id } = useParams();
@@ -31,8 +33,12 @@ export default function DocumentDetailPage() {
   const [showRatingPopup, setShowRatingPopup] = useState(false);
   const [ratingMessage, setRatingMessage] = useState('');
 
+  // ✅ THÊM STATES CHO TRẢ PHÍ
+  const [isPurchased, setIsPurchased] = useState(false);
+  const [userCoins, setUserCoins] = useState(0);
+  const [showPurchaseModal, setShowPurchaseModal] = useState(false);
 
-   useEffect(() => {
+  useEffect(() => {
     const loggedIn = localStorage.getItem('isLoggedIn') === 'true';
     const userId = localStorage.getItem('userId') || '';
     const role = localStorage.getItem('userRole') || '';
@@ -41,10 +47,12 @@ export default function DocumentDetailPage() {
     setCurrentUserRole(role);
   }, []);
 
-   useEffect(() => {
+  useEffect(() => {
     fetchDocument();
     fetchComments();
-     // eslint-disable-next-line react-hooks/exhaustive-deps
+    checkPurchaseStatus(); // ✅ THÊM
+    loadUserCoins(); // ✅ THÊM
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   useEffect(() => {
@@ -53,7 +61,18 @@ export default function DocumentDetailPage() {
       setEditDesc(document.description);
     }
   }, [showEditPopup, document]);
-  
+
+  useEffect(() => {
+    if (isLoggedIn && document) {
+      checkSavedStatus();
+    }
+  }, [isLoggedIn, document]);
+
+  useEffect(() => {
+    if (isLoggedIn && document) {
+      fetchUserRating();
+    }
+  }, [isLoggedIn, document]);
   const fetchDocument = async () => {
     setLoading(true);
     try {
@@ -79,203 +98,262 @@ export default function DocumentDetailPage() {
     }
   };
 
-  useEffect(() => {
-  if (isLoggedIn && document) {
-    checkSavedStatus();
-  }
-}, [isLoggedIn, document]);
+  // ✅ THÊM: Kiểm tra đã mua tài liệu chưa
+  const checkPurchaseStatus = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) return;
 
-const checkSavedStatus = async () => {
+      const res = await fetch(`http://localhost:5000/api/documents/${id}/check-purchase`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      setIsPurchased(data.isPurchased);
+      console.log('💰 Purchase status:', data.isPurchased);
+    } catch (error) {
+      console.error('Error checking purchase:', error);
+    }
+  };
+
+  // ✅ THÊM: Lấy số dư
+  const loadUserCoins = () => {
+    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    setUserCoins(user.coins || 0);
+    console.log('💵 User coins:', user.coins || 0);
+  };
+
+  // ✅ THÊM: Mua tài liệu
+  const handlePurchase = async () => {
+  const token = localStorage.getItem('token');
+  
+  if (!token) {
+    alert('Vui lòng đăng nhập để mua tài liệu!');
+    navigate('/login');
+    return;
+  }
+
+  if (userCoins < document.price) {
+    alert(`Số dư không đủ! Bạn cần thêm ${document.price - userCoins} DP.`);
+    navigate('/recharge');
+    return;
+  }
+
+  try {
+    const response = await fetch(`http://localhost:5000/api/documents/${id}/purchase`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    const data = await response.json();
+
+    if (response.ok) {
+      if (data.alreadyPurchased) {
+        alert('Bạn đã mua tài liệu này rồi!');
+      } else {
+        // ✅ SỬ DỤNG HELPER
+        await refreshUserData();
+        
+        const newCoins = parseInt(localStorage.getItem('userCoins') || '0');
+        setUserCoins(newCoins);
+        
+        alert('✅ Mua tài liệu thành công!');
+        setIsPurchased(true);
+      }
+      setShowPurchaseModal(false);
+    } else {
+      if (data.needRecharge) {
+        alert('Số dư không đủ! Vui lòng nạp thêm tiền.');
+        navigate('/recharge');
+      } else {
+        alert(data.message || 'Có lỗi xảy ra!');
+      }
+    }
+  } catch (error) {
+    console.error('Error purchasing:', error);
+    alert('Có lỗi xảy ra khi mua tài liệu!');
+  }
+  };
+
+  const checkSavedStatus = useCallback(async () => {
   try {
     const token = localStorage.getItem('token');
     const res = await fetch(`http://localhost:5000/api/users/saved/check/${id}`, {
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
+      headers: { 'Authorization': `Bearer ${token}` }
     });
     const data = await res.json();
     setIsSaved(data.isSaved);
   } catch (err) {
     console.error('❌ Error checking saved status:', err);
   }
-};
+}, [id]);
 
 
- const handleSave = async () => {
-  if (!isLoggedIn) {
-    const goToLogin = window.confirm('Bạn cần đăng nhập để lưu tài liệu!\n\nBấm OK để đến trang đăng nhập.');
-    if (goToLogin) {
-      navigate('/login');
-    }
-    return;
-  }
-
-  setSavingDocument(true);
-  try {
-    const token = localStorage.getItem('token');
-    const res = await fetch(`http://localhost:5000/api/users/saved/${id}`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`
+  const handleSave = async () => {
+    if (!isLoggedIn) {
+      const goToLogin = window.confirm('Bạn cần đăng nhập để lưu tài liệu!\n\nBấm OK để đến trang đăng nhập.');
+      if (goToLogin) {
+        navigate('/login');
       }
-    });
-
-    const data = await res.json();
-    
-    if (res.ok) {
-      setIsSaved(data.isSaved);
-      alert(data.message);
-    } else {
-      alert('Có lỗi xảy ra: ' + data.message);
+      return;
     }
-  } catch (err) {
-    console.error('❌ Error saving document:', err);
-    alert('Có lỗi xảy ra khi lưu tài liệu!');
-  } finally {
-    setSavingDocument(false);
-  }
-};
 
+    setSavingDocument(true);
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`http://localhost:5000/api/users/saved/${id}`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      const data = await res.json();
+      
+      if (res.ok) {
+        setIsSaved(data.isSaved);
+        alert(data.message);
+      } else {
+        alert('Có lỗi xảy ra: ' + data.message);
+      }
+    } catch (err) {
+      console.error('❌ Error saving document:', err);
+      alert('Có lỗi xảy ra khi lưu tài liệu!');
+    } finally {
+      setSavingDocument(false);
+    }
+  };
+
+  // ✅ SỬA: Kiểm tra trả phí trước khi tải
   const handleDownload = async () => {
-  if (!isLoggedIn) {
-    const goToLogin = window.confirm('Bạn cần đăng nhập để tải tài liệu!\n\nBấm OK để đến trang đăng nhập.');
-    if (goToLogin) {
-      navigate('/login');
-    }
-    return;
-  }
-
-  try {
-    // Tăng số lượt download
-    await fetch(`http://localhost:5000/api/documents/${id}/download`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`
+    if (!isLoggedIn) {
+      const goToLogin = window.confirm('Bạn cần đăng nhập để tải tài liệu!\n\nBấm OK để đến trang đăng nhập.');
+      if (goToLogin) {
+        navigate('/login');
       }
-    });
+      return;
+    }
 
-    // Lấy tên file từ URL
-    let fileUrl = document.fileUrl;
-    const filename = fileUrl.split('/').pop(); // Lấy phần cuối cùng của URL
-    
-    // Sử dụng route /download thay vì /uploads
-    const downloadUrl = `http://localhost:5000/download/${filename}`;
+    // ✅ KIỂM TRA TÀI LIỆU TRẢ PHÍ
+    if (document.isPaid && !isPurchased) {
+      alert('⚠️ Vui lòng mua tài liệu để tải xuống!');
+      setShowPurchaseModal(true);
+      return;
+    }
 
-    // Trigger download
-    const link = window.document.createElement('a');
-    link.href = downloadUrl;
-    link.download = document.fileName || document.title || 'document';
-    
-    window.document.body.appendChild(link);
-    link.click();
-    window.document.body.removeChild(link);
+    try {
+      await fetch(`http://localhost:5000/api/documents/${id}/download`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+      });
 
-    console.log('📥 Download started:', document.title);
-    
-    // Thông báo thành công
-    setTimeout(() => {
-      alert('Tài liệu đang được tải xuống!');
-    }, 100);
+      let fileUrl = document.fileUrl;
+      const filename = fileUrl.split('/').pop();
+      const downloadUrl = `http://localhost:5000/download/${filename}`;
 
-  } catch (err) {
-    console.error('❌ Error downloading:', err);
-    alert('Có lỗi xảy ra khi tải tài liệu!');
-  }
-};
+      const link = window.document.createElement('a');
+      link.href = downloadUrl;
+      link.download = document.fileName || document.title || 'document';
+      
+      window.document.body.appendChild(link);
+      link.click();
+      window.document.body.removeChild(link);
 
-useEffect(() => {
-  if (isLoggedIn && document) {
-    fetchUserRating();
-  }
-}, [isLoggedIn, document]);
+      console.log('📥 Download started:', document.title);
+      
+      setTimeout(() => {
+        alert('Tài liệu đang được tải xuống!');
+      }, 100);
 
-const fetchUserRating = async () => {
+    } catch (err) {
+      console.error('❌ Error downloading:', err);
+      alert('Có lỗi xảy ra khi tải tài liệu!');
+    }
+  };
+
+  const fetchUserRating = useCallback(async () => {
   try {
     const token = localStorage.getItem('token');
     const res = await fetch(`http://localhost:5000/api/ratings/${id}`, {
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
+      headers: { 'Authorization': `Bearer ${token}` }
     });
     const data = await res.json();
     setUserRating(data.userRating || 0);
   } catch (err) {
     console.error('❌ Error fetching user rating:', err);
   }
-};
+}, [id]);
 
   const handleRatingClick = async (rating) => {
-  if (!isLoggedIn) {
-    const goToLogin = window.confirm('Bạn cần đăng nhập để đánh giá!\n\nBấm OK để đến trang đăng nhập.');
-    if (goToLogin) {
-      navigate('/login');
+    if (!isLoggedIn) {
+      const goToLogin = window.confirm('Bạn cần đăng nhập để đánh giá!\n\nBấm OK để đến trang đăng nhập.');
+      if (goToLogin) {
+        navigate('/login');
+      }
+      return;
     }
-    return;
-  }
 
-  try {
-    const token = localStorage.getItem('token');
-    const res = await fetch('http://localhost:5000/api/ratings', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-      },
-      body: JSON.stringify({
-        documentId: id,
-        rating
-      })
-    });
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch('http://localhost:5000/api/ratings', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          documentId: id,
+          rating
+        })
+      });
 
-    const data = await res.json();
+      const data = await res.json();
 
-    if (res.ok) {
-      setUserRating(rating);
-      setRatingMessage(data.message);
-      setShowRatingPopup(true);
-      
-      // Cập nhật average rating
-      setDocument(prev => ({
-        ...prev,
-        averageRating: data.averageRating,
-        totalRatings: data.totalRatings
-      }));
-    } else {
-      alert(data.message || 'Có lỗi xảy ra khi đánh giá!');
+      if (res.ok) {
+        setUserRating(rating);
+        setRatingMessage(data.message);
+        setShowRatingPopup(true);
+        
+        setDocument(prev => ({
+          ...prev,
+          averageRating: data.averageRating,
+          totalRatings: data.totalRatings
+        }));
+      } else {
+        alert(data.message || 'Có lỗi xảy ra khi đánh giá!');
+      }
+    } catch (err) {
+      console.error('❌ Error rating document:', err);
+      alert('Có lỗi xảy ra khi đánh giá!');
     }
-  } catch (err) {
-    console.error('❌ Error rating document:', err);
-    alert('Có lỗi xảy ra khi đánh giá!');
-  }
-};
+  };
 
-const renderStars = () => {
-  const stars = [];
-  const displayRating = hoverRating || userRating;
+  const renderStars = () => {
+    const stars = [];
+    const displayRating = hoverRating || userRating;
 
-  for (let i = 1; i <= 5; i++) {
-    stars.push(
-      <span
-        key={i}
-        onClick={() => handleRatingClick(i)}
-        onMouseEnter={() => setHoverRating(i)}
-        onMouseLeave={() => setHoverRating(0)}
-        style={{
-          fontSize: '32px',
-          cursor: 'pointer',
-          color: i <= displayRating ? '#ffc107' : '#ddd',
-          transition: 'color 0.2s',
-          marginRight: '5px'
-        }}
-      >
-        ★
-      </span>
-    );
-  }
+    for (let i = 1; i <= 5; i++) {
+      stars.push(
+        <span
+          key={i}
+          onClick={() => handleRatingClick(i)}
+          onMouseEnter={() => setHoverRating(i)}
+          onMouseLeave={() => setHoverRating(0)}
+          style={{
+            fontSize: '32px',
+            cursor: 'pointer',
+            color: i <= displayRating ? '#ffc107' : '#ddd',
+            transition: 'color 0.2s',
+            marginRight: '5px'
+          }}
+        >
+          ★
+        </span>
+      );
+    }
 
-  return stars;
-};
-
+    return stars;
+  };
   const handlePostComment = async () => {
     if (!isLoggedIn) {
       alert('Vui lòng đăng nhập để bình luận!');
@@ -396,9 +474,7 @@ const renderStars = () => {
       const token = localStorage.getItem('token');
       const res = await fetch(`http://localhost:5000/api/comments/${commentId}`, {
         method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+        headers: { 'Authorization': `Bearer ${token}` }
       });
 
       if (res.ok) {
@@ -423,9 +499,7 @@ const renderStars = () => {
       const token = localStorage.getItem('token');
       const res = await fetch(`http://localhost:5000/api/comments/${commentId}/like`, {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+        headers: { 'Authorization': `Bearer ${token}` }
       });
 
       if (res.ok) {
@@ -449,90 +523,89 @@ const renderStars = () => {
   };
 
   const renderDocumentViewer = () => {
-  if (!document.fileUrl) {
+    if (!document.fileUrl) {
+      return (
+        <div style={{ padding: '60px', textAlign: 'center' }}>
+          <div style={{ fontSize: '60px', marginBottom: '15px' }}>📄</div>
+          <p style={{ color: '#666' }}>Không tìm thấy file để xem</p>
+        </div>
+      );
+    }
+
+    let fileUrl = document.fileUrl;
+    
+    if (!fileUrl.startsWith('http')) {
+      fileUrl = `http://localhost:5000${fileUrl}`;
+    }
+
+    const fileType = document.fileType || '';
+
+    // Preview PDF
+    if (fileType.includes('pdf') || fileUrl.endsWith('.pdf')) {
+      return (
+        <div>
+          <iframe
+            src={fileUrl}
+            style={{
+              width: '100%',
+              height: '700px',
+              border: '1px solid #ddd',
+              borderRadius: '8px'
+            }}
+            title="PDF Preview"
+          />
+          <div style={{ textAlign: 'center', marginTop: '15px', fontSize: '13px', color: '#888' }}>
+            💡 Tip: Cuộn để xem toàn bộ tài liệu
+          </div>
+        </div>
+      );
+    }
+
+    // Preview Word
+    if (fileType.includes('word') || fileType.includes('document') || 
+        fileUrl.match(/\.(doc|docx)$/i)) {
+      return (
+        <div>
+          <iframe
+            src={`http://localhost:5000/api/documents/${id}/preview`}
+            style={{
+              width: '100%',
+              height: '700px',
+              border: '1px solid #ddd',
+              borderRadius: '8px',
+              background: '#fff'
+            }}
+            title="Word Preview"
+          />
+          <div style={{ textAlign: 'center', marginTop: '15px', fontSize: '13px', color: '#888' }}>
+            📄 Xem trước file Word
+          </div>
+        </div>
+      );
+    }
+
+    // Các file khác không preview được
     return (
       <div style={{ padding: '60px', textAlign: 'center' }}>
         <div style={{ fontSize: '60px', marginBottom: '15px' }}>📄</div>
-        <p style={{ color: '#666' }}>Không tìm thấy file để xem</p>
+        <p style={{ color: '#666', marginBottom: '15px' }}>
+          Xem trước không khả dụng
+        </p>
+        <button onClick={handleDownload} style={{
+          padding: '12px 30px',
+          background: '#0d7a4f',
+          color: '#fff',
+          border: 'none',
+          borderRadius: '6px',
+          fontSize: '15px',
+          fontWeight: 'bold',
+          cursor: 'pointer'
+        }}>
+          📥 Tải xuống
+        </button>
       </div>
     );
-  }
-
-  let fileUrl = document.fileUrl;
-  
-  // ✅ QUAN TRỌNG: Phải dùng /uploads chứ KHÔNG phải /download
-  if (!fileUrl.startsWith('http')) {
-    fileUrl = `http://localhost:5000${fileUrl}`;  // Giữ nguyên /uploads trong URL
-  }
-
-  const fileType = document.fileType || '';
-
-  // Preview PDF
-  if (fileType.includes('pdf') || fileUrl.endsWith('.pdf')) {
-    return (
-      <div>
-        <iframe
-          src={fileUrl}  // ← URL phải là /uploads/filename.pdf
-          style={{
-            width: '100%',
-            height: '700px',
-            border: '1px solid #ddd',
-            borderRadius: '8px'
-          }}
-          title="PDF Preview"
-        />
-        <div style={{ textAlign: 'center', marginTop: '15px', fontSize: '13px', color: '#888' }}>
-          💡 Tip: Cuộn để xem toàn bộ tài liệu
-        </div>
-      </div>
-    );
-  }
-
-  // Preview Word
-  if (fileType.includes('word') || fileType.includes('document') || 
-      fileUrl.match(/\.(doc|docx)$/i)) {
-    return (
-      <div>
-        <iframe
-          src={`http://localhost:5000/api/documents/${id}/preview`}  // ← Route preview riêng
-          style={{
-            width: '100%',
-            height: '700px',
-            border: '1px solid #ddd',
-            borderRadius: '8px',
-            background: '#fff'
-          }}
-          title="Word Preview"
-        />
-        <div style={{ textAlign: 'center', marginTop: '15px', fontSize: '13px', color: '#888' }}>
-          📄 Xem trước file Word
-        </div>
-      </div>
-    );
-  }
-
-  // Các file khác không preview được
-  return (
-    <div style={{ padding: '60px', textAlign: 'center' }}>
-      <div style={{ fontSize: '60px', marginBottom: '15px' }}>📄</div>
-      <p style={{ color: '#666', marginBottom: '15px' }}>
-        Xem trước không khả dụng
-      </p>
-      <button onClick={handleDownload} style={{
-        padding: '12px 30px',
-        background: '#0d7a4f',
-        color: '#fff',
-        border: 'none',
-        borderRadius: '6px',
-        fontSize: '15px',
-        fontWeight: 'bold',
-        cursor: 'pointer'
-      }}>
-        📥 Tải xuống
-      </button>
-    </div>
-  );
-};
+  };
 
   const handleFileChange = (e) => {
     setEditFile(e.target.files[0]);
@@ -563,9 +636,7 @@ const renderStars = () => {
     }
   };
 
-  const canEdit =
-    (currentUserId === document?.uploadedBy?._id || currentUserRole === 'admin');
-
+  const canEdit = (currentUserId === document?.uploadedBy?._id || currentUserRole === 'admin');
 
   if (loading) {
     return (
@@ -591,732 +662,784 @@ const renderStars = () => {
     );
   }
 
+  return (
+    <div style={{ minHeight: '100vh', background: '#fffffe', fontFamily: 'Arial, sans-serif' }}>
+      <Header />
+      <div style={{ height: '130px' }}></div>
+      
+      <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '20px' }}>
+        {/* Breadcrumb */}
+        <div style={{ fontSize: '13px', color: '#888', marginBottom: '20px' }}>
+          <span onClick={() => navigate('/')} style={{ cursor: 'pointer', color: '#4ba3d6' }}>
+            Trang chủ
+          </span>
+          {' > '}
+          <span style={{ color: '#133a5c' }}>{document.category}</span>
+          {' > '}
+          <span>{document.title}</span>
+        </div>
 
-    return (
-  <div style={{ minHeight: '100vh', background: '#fffffe', fontFamily: 'Arial, sans-serif' }}>
-    <Header />
-    <div style={{ height: '130px' }}></div>
-    
-    <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '20px' }}>
-      {/* Breadcrumb */}
-      <div style={{ fontSize: '13px', color: '#888', marginBottom: '20px' }}>
-        <span onClick={() => navigate('/')} style={{ cursor: 'pointer', color: '#4ba3d6' }}>
-          Trang chủ
-        </span>
-        {' > '}
-        <span style={{ color: '#133a5c' }}>{document.category}</span>
-        {' > '}
-        <span>{document.title}</span>
-      </div>
-
-      {/* Main Layout: Content + Sidebar */}
-      <div style={{ display: 'flex', gap: '30px' }}>
-        
-        {/* ==================== LEFT COLUMN: MAIN CONTENT ==================== */}
-        <div style={{ flex: '2' }}>
+        {/* Main Layout */}
+        <div style={{ display: 'flex', gap: '30px' }}>
           
-          {/* Document Viewer */}
-          <div style={{
-            background: '#fff',
-            borderRadius: '8px',
-            padding: '20px',
-            marginBottom: '20px',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.06)'
-          }}>
-            <h3 style={{ color: '#133a5c', marginBottom: '15px', textAlign: 'center' }}>
-              📖 Xem trước tài liệu
-              {canEdit && (
-                <button
+          {/* LEFT COLUMN: MAIN CONTENT */}
+          <div style={{ flex: '2' }}>
+            
+            {/* Document Viewer */}
+            <div style={{
+              background: '#fff',
+              borderRadius: '8px',
+              padding: '20px',
+              marginBottom: '20px',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.06)'
+            }}>
+              <h3 style={{ color: '#133a5c', marginBottom: '15px', textAlign: 'center' }}>
+                📖 Xem trước tài liệu
+                {canEdit && (
+                  <button
+                    style={{
+                      padding: '8px 18px',
+                      marginLeft: '15px',
+                      background: '#4ba3d6',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: '6px',
+                      fontSize: '14px',
+                      fontWeight: 'bold',
+                      cursor: 'pointer'
+                    }}
+                    onClick={() => setShowEditPopup(true)}
+                  >
+                    ✏️ Chỉnh sửa
+                  </button>
+                )}
+              </h3>
+              {renderDocumentViewer()}
+            </div>
+
+            {/* Description */}
+            <div style={{
+              background: '#fff',
+              borderRadius: '8px',
+              padding: '20px',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+              marginBottom: '30px'
+            }}>
+              <h3 style={{ color: '#133a5c', marginBottom: '15px' }}>Mô tả</h3>
+              <p style={{ color: '#2d4a67', lineHeight: '1.6', fontSize: '14px' }}>
+                {document.description}
+              </p>
+            </div>
+
+            {/* Comments Section - Giữ nguyên như code cũ */}
+            <div style={{
+              background: '#fff',
+              borderRadius: '8px',
+              padding: '25px',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.06)'
+            }}>
+              <h3 style={{ color: '#133a5c', marginBottom: '20px' }}>
+                💬 Bình luận ({comments.length})
+              </h3>
+
+              <div style={{ marginBottom: '30px' }}>
+                <textarea
+                  value={newComment}
+                  onChange={(e) => setNewComment(e.target.value)}
+                  placeholder={isLoggedIn ? "Viết bình luận của bạn..." : "Đăng nhập để bình luận"}
+                  disabled={!isLoggedIn}
+                  rows="3"
                   style={{
-                    padding: '8px 18px',
-                    marginLeft: '15px',
-                    background: '#4ba3d6',
+                    width: '100%',
+                    padding: '12px',
+                    fontSize: '14px',
+                    border: '1px solid #ccc',
+                    borderRadius: '6px',
+                    outline: 'none',
+                    resize: 'vertical',
+                    fontFamily: 'Arial, sans-serif',
+                    boxSizing: 'border-box'
+                  }}
+                />
+                <button
+                  onClick={handlePostComment}
+                  disabled={!isLoggedIn}
+                  style={{
+                    marginTop: '10px',
+                    padding: '10px 24px',
+                    background: isLoggedIn ? '#4ba3d6' : '#ccc',
                     color: '#fff',
                     border: 'none',
                     borderRadius: '6px',
                     fontSize: '14px',
                     fontWeight: 'bold',
-                    cursor: 'pointer'
+                    cursor: isLoggedIn ? 'pointer' : 'not-allowed'
                   }}
-                  onClick={() => setShowEditPopup(true)}
                 >
-                  ✏️ Chỉnh sửa
+                  Đăng bình luận
                 </button>
-              )}
-            </h3>
-            {renderDocumentViewer()}
+              </div>
+
+              {/* Comments List - render comments như code cũ, giữ nguyên toàn bộ */}
+              <div>
+                {comments.length > 0 ? (
+                  comments.map(comment => (
+                    <div key={comment._id} style={{
+                      borderBottom: '1px solid #eee',
+                      paddingBottom: '20px',
+                      marginBottom: '20px'
+                    }}>
+                      {<div>
+  {comments.length > 0 ? (
+    comments.map(comment => (
+      <div key={comment._id} style={{
+        borderBottom: '1px solid #eee',
+        paddingBottom: '20px',
+        marginBottom: '20px'
+      }}>
+        {/* Comment Header */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div style={{
+              width: '40px',
+              height: '40px',
+              borderRadius: '50%',
+              background: 'linear-gradient(135deg, #4ba3d6, #0d7a4f)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#fff',
+              fontWeight: 'bold',
+              fontSize: '16px',
+              flexShrink: 0
+            }}>
+              {(comment.user?.username || 'A')[0].toUpperCase()}
+            </div>
+            
+            <div>
+              <div style={{ fontWeight: 'bold', color: '#133a5c', fontSize: '14px' }}>
+                {comment.user?.fullName || comment.user?.username || 'Ẩn danh'}
+              </div>
+              <div style={{ color: '#888', fontSize: '12px' }}>
+                {timeAgo(comment.createdAt)}
+                {comment.updatedAt !== comment.createdAt && ' (đã chỉnh sửa)'}
+              </div>
+            </div>
           </div>
-
-          {/* Description */}
-          <div style={{
-            background: '#fff',
-            borderRadius: '8px',
-            padding: '20px',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
-            marginBottom: '30px'
-          }}>
-            <h3 style={{ color: '#133a5c', marginBottom: '15px' }}>Mô tả</h3>
-            <p style={{ color: '#2d4a67', lineHeight: '1.6', fontSize: '14px' }}>
-              {document.description}
-            </p>
-          </div>
-
-          {/* Comments Section */}
-          <div style={{
-            background: '#fff',
-            borderRadius: '8px',
-            padding: '25px',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.06)'
-          }}>
-            <h3 style={{ color: '#133a5c', marginBottom: '20px' }}>
-              💬 Bình luận ({comments.length})
-            </h3>
-
-            {/* New Comment Input */}
-            <div style={{ marginBottom: '30px' }}>
-              <textarea
-                value={newComment}
-                onChange={(e) => setNewComment(e.target.value)}
-                placeholder={isLoggedIn ? "Viết bình luận của bạn..." : "Đăng nhập để bình luận"}
-                disabled={!isLoggedIn}
-                rows="3"
-                style={{
-                  width: '100%',
-                  padding: '12px',
-                  fontSize: '14px',
-                  border: '1px solid #ccc',
-                  borderRadius: '6px',
-                  outline: 'none',
-                  resize: 'vertical',
-                  fontFamily: 'Arial, sans-serif',
-                  boxSizing: 'border-box'
-                }}
-              />
+          
+          {isLoggedIn && comment.user?._id === currentUserId && (
+            <div style={{ display: 'flex', gap: '8px' }}>
               <button
-                onClick={handlePostComment}
-                disabled={!isLoggedIn}
+                onClick={() => {
+                  setEditingComment(comment._id);
+                  setEditContent(comment.content);
+                }}
                 style={{
-                  marginTop: '10px',
-                  padding: '10px 24px',
-                  background: isLoggedIn ? '#4ba3d6' : '#ccc',
-                  color: '#fff',
-                  border: 'none',
-                  borderRadius: '6px',
-                  fontSize: '14px',
-                  fontWeight: 'bold',
-                  cursor: isLoggedIn ? 'pointer' : 'not-allowed'
+                  padding: '4px 10px',
+                  background: '#f5f5f5',
+                  border: '1px solid #ddd',
+                  borderRadius: '4px',
+                  fontSize: '12px',
+                  cursor: 'pointer',
+                  color: '#133a5c'
                 }}
               >
-                Đăng bình luận
+                ✏️ Sửa
+              </button>
+              <button
+                onClick={() => handleDeleteComment(comment._id)}
+                style={{
+                  padding: '4px 10px',
+                  background: '#fff',
+                  border: '1px solid #e84c61',
+                  borderRadius: '4px',
+                  fontSize: '12px',
+                  cursor: 'pointer',
+                  color: '#e84c61'
+                }}
+              >
+                🗑️ Xóa
               </button>
             </div>
-
-            {/* Comments List */}
-            <div>
-              {comments.length > 0 ? (
-                comments.map(comment => (
-                  <div key={comment._id} style={{
-                    borderBottom: '1px solid #eee',
-                    paddingBottom: '20px',
-                    marginBottom: '20px'
-                  }}>
-                    {/* Comment Header */}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <div style={{
-                          width: '40px',
-                          height: '40px',
-                          borderRadius: '50%',
-                          background: 'linear-gradient(135deg, #4ba3d6, #0d7a4f)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          color: '#fff',
-                          fontWeight: 'bold',
-                          fontSize: '16px',
-                          flexShrink: 0
-                        }}>
-                          {(comment.user?.username || 'A')[0].toUpperCase()}
-                        </div>
-                        
-                        <div>
-                          <div style={{ fontWeight: 'bold', color: '#133a5c', fontSize: '14px' }}>
-                            {comment.user?.fullName || comment.user?.username || 'Ẩn danh'}
-                          </div>
-                          <div style={{ color: '#888', fontSize: '12px' }}>
-                            {timeAgo(comment.createdAt)}
-                            {comment.updatedAt !== comment.createdAt && ' (đã chỉnh sửa)'}
-                          </div>
-                        </div>
-                      </div>
-                      
-                      {isLoggedIn && comment.user?._id === currentUserId && (
-                        <div style={{ display: 'flex', gap: '8px' }}>
-                          <button
-                            onClick={() => {
-                              setEditingComment(comment._id);
-                              setEditContent(comment.content);
-                            }}
-                            style={{
-                              padding: '4px 10px',
-                              background: '#f5f5f5',
-                              border: '1px solid #ddd',
-                              borderRadius: '4px',
-                              fontSize: '12px',
-                              cursor: 'pointer',
-                              color: '#133a5c'
-                            }}
-                          >
-                            ✏️ Sửa
-                          </button>
-                          <button
-                            onClick={() => handleDeleteComment(comment._id)}
-                            style={{
-                              padding: '4px 10px',
-                              background: '#fff',
-                              border: '1px solid #e84c61',
-                              borderRadius: '4px',
-                              fontSize: '12px',
-                              cursor: 'pointer',
-                              color: '#e84c61'
-                            }}
-                          >
-                            🗑️ Xóa
-                          </button>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Comment Content */}
-                    {editingComment === comment._id ? (
-                      <div style={{ marginLeft: '50px' }}>
-                        <textarea
-                          value={editContent}
-                          onChange={(e) => setEditContent(e.target.value)}
-                          rows="3"
-                          style={{
-                            width: '100%',
-                            padding: '10px',
-                            border: '1px solid #4ba3d6',
-                            borderRadius: '4px',
-                            fontSize: '14px',
-                            marginBottom: '8px',
-                            boxSizing: 'border-box'
-                          }}
-                        />
-                        <button
-                          onClick={() => handleEditComment(comment._id)}
-                          style={{
-                            padding: '6px 16px',
-                            background: '#4ba3d6',
-                            color: '#fff',
-                            border: 'none',
-                            borderRadius: '4px',
-                            fontSize: '13px',
-                            cursor: 'pointer',
-                            marginRight: '8px'
-                          }}
-                        >
-                          Lưu
-                        </button>
-                        <button
-                          onClick={() => {
-                            setEditingComment(null);
-                            setEditContent('');
-                          }}
-                          style={{
-                            padding: '6px 16px',
-                            background: '#f5f5f5',
-                            color: '#666',
-                            border: '1px solid #ddd',
-                            borderRadius: '4px',
-                            fontSize: '13px',
-                            cursor: 'pointer'
-                          }}
-                        >
-                          Hủy
-                        </button>
-                      </div>
-                    ) : (
-                      <div style={{
-                        color: '#2d4a67',
-                        fontSize: '14px',
-                        lineHeight: '1.6',
-                        marginBottom: '10px',
-                        marginLeft: '50px'
-                      }}>
-                        {comment.content}
-                      </div>
-                    )}
-
-                    {/* Comment Actions */}
-                    <div style={{ display: 'flex', gap: '20px', alignItems: 'center', marginLeft: '50px' }}>
-                      <button
-                        onClick={() => handleLikeComment(comment._id)}
-                        style={{
-                          background: 'none',
-                          border: 'none',
-                          cursor: isLoggedIn ? 'pointer' : 'not-allowed',
-                          fontSize: '13px',
-                          color: comment.likes?.some(like => like._id === currentUserId) ? '#e84c61' : '#888',
-                          fontWeight: comment.likes?.some(like => like._id === currentUserId) ? 'bold' : 'normal'
-                        }}
-                      >
-                        ❤️ {comment.likes?.length || 0}
-                      </button>
-                      
-                      <button
-                        onClick={() => setReplyingTo(replyingTo === comment._id ? null : comment._id)}
-                        style={{
-                          background: 'none',
-                          border: 'none',
-                          cursor: isLoggedIn ? 'pointer' : 'not-allowed',
-                          fontSize: '13px',
-                          color: '#4ba3d6'
-                        }}
-                      >
-                        💬 Trả lời
-                      </button>
-                    </div>
-
-                    {/* Reply Input */}
-                    {replyingTo === comment._id && (
-                      <div style={{ marginTop: '15px', marginLeft: '50px', paddingLeft: '20px', borderLeft: '3px solid #4ba3d6' }}>
-                        <textarea
-                          value={replyContent}
-                          onChange={(e) => setReplyContent(e.target.value)}
-                          placeholder="Viết trả lời..."
-                          rows="2"
-                          style={{
-                            width: '100%',
-                            padding: '10px',
-                            border: '1px solid #ccc',
-                            borderRadius: '4px',
-                            fontSize: '14px',
-                            marginBottom: '8px',
-                            boxSizing: 'border-box'
-                          }}
-                        />
-                        <button
-                          onClick={() => handlePostReply(comment._id)}
-                          style={{
-                            padding: '6px 16px',
-                            background: '#4ba3d6',
-                            color: '#fff',
-                            border: 'none',
-                            borderRadius: '4px',
-                            fontSize: '13px',
-                            cursor: 'pointer',
-                            marginRight: '8px'
-                          }}
-                        >
-                          Gửi
-                        </button>
-                        <button
-                          onClick={() => {
-                            setReplyingTo(null);
-                            setReplyContent('');
-                          }}
-                          style={{
-                            padding: '6px 16px',
-                            background: '#f5f5f5',
-                            color: '#666',
-                            border: '1px solid #ddd',
-                            borderRadius: '4px',
-                            fontSize: '13px',
-                            cursor: 'pointer'
-                          }}
-                        >
-                          Hủy
-                        </button>
-                      </div>
-                    )}
-
-                    {/* Replies */}
-                    {comment.replies && comment.replies.length > 0 && (
-                      <div style={{ marginTop: '15px', marginLeft: '50px', paddingLeft: '30px', borderLeft: '2px solid #eee' }}>
-                        {comment.replies.map(reply => (
-                          <div key={reply._id} style={{ marginBottom: '15px' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <div style={{
-                                  width: '32px',
-                                  height: '32px',
-                                  borderRadius: '50%',
-                                  background: 'linear-gradient(135deg, #4ba3d6, #0d7a4f)',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  color: '#fff',
-                                  fontWeight: 'bold',
-                                  fontSize: '13px',
-                                  flexShrink: 0
-                                }}>
-                                  {(reply.user?.username || 'A')[0].toUpperCase()}
-                                </div>
-                                
-                                <div>
-                                  <div style={{ fontWeight: 'bold', color: '#133a5c', fontSize: '13px' }}>
-                                    {reply.user?.fullName || reply.user?.username || 'Ẩn danh'}
-                                  </div>
-                                  <div style={{ color: '#888', fontSize: '11px' }}>
-                                    {timeAgo(reply.createdAt)}
-                                  </div>
-                                </div>
-                              </div>
-                              
-                              {isLoggedIn && reply.user?._id === currentUserId && (
-                                <button
-                                  onClick={() => handleDeleteComment(reply._id)}
-                                  style={{
-                                    padding: '2px 8px',
-                                    background: '#fff',
-                                    border: '1px solid #e84c61',
-                                    borderRadius: '3px',
-                                    fontSize: '11px',
-                                    cursor: 'pointer',
-                                    color: '#e84c61'
-                                  }}
-                                >
-                                  Xóa
-                                </button>
-                              )}
-                            </div>
-                            
-                            <div style={{ color: '#2d4a67', fontSize: '13px', marginTop: '6px', marginLeft: '40px' }}>
-                              {reply.content}
-                            </div>
-                            
-                            <button
-                              onClick={() => handleLikeComment(reply._id)}
-                              style={{
-                                background: 'none',
-                                border: 'none',
-                                cursor: isLoggedIn ? 'pointer' : 'not-allowed',
-                                fontSize: '12px',
-                                color: reply.likes?.some(like => like._id === currentUserId) ? '#e84c61' : '#888',
-                                marginTop: '6px',
-                                marginLeft: '40px'
-                              }}
-                            >
-                              ❤️ {reply.likes?.length || 0}
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                ))
-              ) : (
-                <div style={{ textAlign: 'center', padding: '40px', color: '#888' }}>
-                  Chưa có bình luận nào. Hãy là người đầu tiên!
-                </div>
-              )}
-            </div>
-          </div>
+          )}
         </div>
 
-        {/* ==================== RIGHT COLUMN: SIDEBAR ==================== */}
-        <div style={{ flex: '1' }}>
-          <div style={{
-            background: '#fff',
-            borderRadius: '8px',
-            padding: '25px',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
-            position: 'sticky',
-            top: '150px'
-          }}>
-            {/* Document Title */}
-            <h2 style={{ color: '#133a5c', fontSize: '22px', marginBottom: '15px' }}>
-              {document.title}
-            </h2>
-            
-            {/* Statistics */}
-            <div style={{ 
-              display: 'flex', 
-              gap: '20px', 
-              marginBottom: '20px', 
-              paddingBottom: '20px', 
-              borderBottom: '1px solid #eee' 
-            }}>
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#133a5c' }}>
-                  {document.downloads || 0}
-                </div>
-                <div style={{ fontSize: '12px', color: '#888' }}>Lượt tải</div>
-              </div>
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#133a5c' }}>
-                  {document.views || 0}
-                </div>
-                <div style={{ fontSize: '12px', color: '#888' }}>Lượt xem</div>
-              </div>
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#133a5c' }}>
-                  {document.fileSize ? (document.fileSize / 1024).toFixed(1) : '0'}
-                </div>
-                <div style={{ fontSize: '12px', color: '#888' }}>KB</div>
-              </div>
-            </div>
-
-            {/* Document Info */}
-            <InfoRow label="Người đăng" value={document.uploadedBy?.username || 'Ẩn danh'} />
-            <InfoRow label="Ngày đăng" value={document.uploadDate ? new Date(document.uploadDate).toLocaleDateString('vi-VN') : ''} />
-            <InfoRow label="Danh mục" value={document.category} />
-            
-            {/* ✅ RATING SECTION */}
-            <div style={{ marginBottom: '20px', paddingBottom: '20px', borderBottom: '1px solid #eee' }}>
-              <div style={{ fontSize: '14px', color: '#133a5c', marginBottom: '10px', fontWeight: 'bold' }}>
-                ⭐ Đánh giá tài liệu
-              </div>
-              
-              {/* Average Rating Display */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '15px' }}>
-                <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#133a5c' }}>
-                  {document.averageRating || '0.0'}
-                </div>
-                <div>
-                  {'⭐'.repeat(Math.round(document.averageRating || 0))}
-                  {'☆'.repeat(5 - Math.round(document.averageRating || 0))}
-                </div>
-              </div>
-
-              {/* User Rating Input */}
-              <div style={{ fontSize: '13px', color: '#666', marginBottom: '8px' }}>
-                {userRating > 0 ? `Bạn đã đánh giá ${userRating} sao` : (isLoggedIn ? 'Đánh giá của bạn:' : 'Đăng nhập để đánh giá')}
-              </div>
-              
-              <div style={{ 
-                display: 'flex', 
-                gap: '5px',
-                justifyContent: 'center',
-                marginTop: '10px'
-              }}>
-                {renderStars()}
-              </div>
-            </div>
-
-            {/* Tags */}
-            <div style={{ marginBottom: '20px' }}>
-              <div style={{ fontSize: '14px', color: '#133a5c', marginBottom: '10px', fontWeight: 'bold' }}>
-                Tags
-              </div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                {(document.tags || []).filter(Boolean).map((tag, idx) => (
-                  <span key={idx} style={{
-                    background: '#e8f4f8',
-                    color: '#133a5c',
-                    padding: '5px 12px',
-                    borderRadius: '15px',
-                    fontSize: '12px',
-                    cursor: 'pointer'
-                  }}>
-                    {tag}
-                  </span>
-                ))}
-              </div>
-            </div>
-
-            {/* Action Buttons */}
-            <button onClick={handleDownload} style={{
-              width: '100%',
-              padding: '12px',
-              background: '#0d7a4f',
-              color: '#fff',
-              border: 'none',
-              borderRadius: '6px',
-              fontSize: '14px',
-              fontWeight: 'bold',
-              cursor: 'pointer',
-              marginBottom: '10px'
-            }}>
-              📥 Tải xuống
-            </button>
-            
-            <button onClick={handleSave} 
-              disabled={savingDocument}
+        {/* Comment Content */}
+        {editingComment === comment._id ? (
+          <div style={{ marginLeft: '50px' }}>
+            <textarea
+              value={editContent}
+              onChange={(e) => setEditContent(e.target.value)}
+              rows="3"
               style={{
                 width: '100%',
-                padding: '12px',
-                background: isSaved ? '#e8f4f8' : '#fff',
-                color: isSaved ? '#133a5c' : '#2d4a67',
-                border: isSaved ? '2px solid #4ba3d6' : '1px solid #4ba3d6',
-                borderRadius: '6px',
+                padding: '10px',
+                border: '1px solid #4ba3d6',
+                borderRadius: '4px',
                 fontSize: '14px',
-                fontWeight: 'bold',
-                cursor: savingDocument ? 'not-allowed' : 'pointer',
-                opacity: savingDocument ? 0.6 : 1
-              }}
-            >
-              {savingDocument ? '⏳ Đang xử lý...' : (isSaved ? '✓ Đã lưu' : '🔖 Lưu tài liệu')}
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    {/* ==================== POPUPS ==================== */}
-    
-    {/* Edit Document Popup */}
-    {showEditPopup && (
-      <div style={{
-        position: 'fixed', 
-        left: 0, 
-        top: 0, 
-        right: 0, 
-        bottom: 0,
-        background: 'rgba(0,0,0,0.5)', 
-        zIndex: 9999, 
-        display: 'flex', 
-        alignItems: 'center', 
-        justifyContent: 'center'
-      }}>
-        <div style={{
-          background: '#fff', 
-          borderRadius: '10px', 
-          padding: '40px', 
-          boxShadow: '0 6px 40px rgba(0,0,0,0.18)', 
-          minWidth: '380px'
-        }}>
-          <h3 style={{ color: '#133a5c', marginBottom: '16px' }}>Chỉnh sửa tài liệu</h3>
-          
-          <div style={{ marginBottom: '14px' }}>
-            <label style={{ fontWeight: 'bold', color: '#133a5c' }}>Tên tài liệu</label>
-            <input 
-              value={editTitle} 
-              onChange={e => setEditTitle(e.target.value)} 
-              style={{
-                width: '100%', 
-                padding: '8px', 
-                borderRadius: '5px', 
-                border: '1px solid #8ecae6', 
-                fontSize: '15px'
+                marginBottom: '8px',
+                boxSizing: 'border-box'
               }}
             />
-          </div>
-          
-          <div style={{ marginBottom: '14px' }}>
-            <label style={{ fontWeight: 'bold', color: '#133a5c' }}>Mô tả</label>
-            <textarea 
-              value={editDesc} 
-              onChange={e => setEditDesc(e.target.value)} 
-              rows={3} 
+            <button
+              onClick={() => handleEditComment(comment._id)}
               style={{
-                width: '100%', 
-                padding: '8px', 
-                borderRadius: '5px', 
-                border: '1px solid #8ecae6', 
-                fontSize: '15px'
-              }}
-            />
-          </div>
-          
-          <div style={{ marginBottom: '18px' }}>
-            <label style={{ fontWeight: 'bold', color: '#133a5c' }}>Thay thế file</label>
-            <input 
-              type="file" 
-              accept=".pdf,.doc,.docx,.ppt,.pptx" 
-              onChange={handleFileChange} 
-            />
-          </div>
-          
-          <div style={{ display: 'flex', gap: 15, marginTop: 15 }}>
-            <button 
-              onClick={handleEditSubmit} 
-              style={{
-                background: '#219e67', 
-                color: '#fff', 
-                padding: '10px 28px', 
-                fontWeight: 'bold', 
-                borderRadius: '6px', 
-                border: 'none', 
-                cursor: 'pointer'
+                padding: '6px 16px',
+                background: '#4ba3d6',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '4px',
+                fontSize: '13px',
+                cursor: 'pointer',
+                marginRight: '8px'
               }}
             >
               Lưu
             </button>
-            <button 
-              onClick={() => setShowEditPopup(false)} 
+            <button
+              onClick={() => {
+                setEditingComment(null);
+                setEditContent('');
+              }}
               style={{
-                background: '#efefef', 
-                color: '#133a5c', 
-                padding: '10px 28px', 
-                fontWeight: 'bold', 
-                borderRadius: '6px', 
-                border: 'none', 
+                padding: '6px 16px',
+                background: '#f5f5f5',
+                color: '#666',
+                border: '1px solid #ddd',
+                borderRadius: '4px',
+                fontSize: '13px',
                 cursor: 'pointer'
               }}
             >
               Hủy
             </button>
           </div>
+        ) : (
+          <div style={{
+            color: '#2d4a67',
+            fontSize: '14px',
+            lineHeight: '1.6',
+            marginBottom: '10px',
+            marginLeft: '50px'
+          }}>
+            {comment.content}
+          </div>
+        )}
+
+        {/* Comment Actions */}
+        <div style={{ display: 'flex', gap: '20px', alignItems: 'center', marginLeft: '50px' }}>
+          <button
+            onClick={() => handleLikeComment(comment._id)}
+            style={{
+              background: 'none',
+              border: 'none',
+              cursor: isLoggedIn ? 'pointer' : 'not-allowed',
+              fontSize: '13px',
+              color: comment.likes?.some(like => like._id === currentUserId) ? '#e84c61' : '#888',
+              fontWeight: comment.likes?.some(like => like._id === currentUserId) ? 'bold' : 'normal'
+            }}
+          >
+            ❤️ {comment.likes?.length || 0}
+          </button>
+          
+          <button
+            onClick={() => setReplyingTo(replyingTo === comment._id ? null : comment._id)}
+            style={{
+              background: 'none',
+              border: 'none',
+              cursor: isLoggedIn ? 'pointer' : 'not-allowed',
+              fontSize: '13px',
+              color: '#4ba3d6'
+            }}
+          >
+            💬 Trả lời
+          </button>
+        </div>
+
+        {/* Reply Input */}
+        {replyingTo === comment._id && (
+          <div style={{ marginTop: '15px', marginLeft: '50px', paddingLeft: '20px', borderLeft: '3px solid #4ba3d6' }}>
+            <textarea
+              value={replyContent}
+              onChange={(e) => setReplyContent(e.target.value)}
+              placeholder="Viết trả lời..."
+              rows="2"
+              style={{
+                width: '100%',
+                padding: '10px',
+                border: '1px solid #ccc',
+                borderRadius: '4px',
+                fontSize: '14px',
+                marginBottom: '8px',
+                boxSizing: 'border-box'
+              }}
+            />
+            <button
+              onClick={() => handlePostReply(comment._id)}
+              style={{
+                padding: '6px 16px',
+                background: '#4ba3d6',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '4px',
+                fontSize: '13px',
+                cursor: 'pointer',
+                marginRight: '8px'
+              }}
+            >
+              Gửi
+            </button>
+            <button
+              onClick={() => {
+                setReplyingTo(null);
+                setReplyContent('');
+              }}
+              style={{
+                padding: '6px 16px',
+                background: '#f5f5f5',
+                color: '#666',
+                border: '1px solid #ddd',
+                borderRadius: '4px',
+                fontSize: '13px',
+                cursor: 'pointer'
+              }}
+            >
+              Hủy
+            </button>
+          </div>
+        )}
+
+        {/* Replies */}
+        {comment.replies && comment.replies.length > 0 && (
+          <div style={{ marginTop: '15px', marginLeft: '50px', paddingLeft: '30px', borderLeft: '2px solid #eee' }}>
+            {comment.replies.map(reply => (
+              <div key={reply._id} style={{ marginBottom: '15px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{
+                      width: '32px',
+                      height: '32px',
+                      borderRadius: '50%',
+                      background: 'linear-gradient(135deg, #4ba3d6, #0d7a4f)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#fff',
+                      fontWeight: 'bold',
+                      fontSize: '13px',
+                      flexShrink: 0
+                    }}>
+                      {(reply.user?.username || 'A')[0].toUpperCase()}
+                    </div>
+                    
+                    <div>
+                      <div style={{ fontWeight: 'bold', color: '#133a5c', fontSize: '13px' }}>
+                        {reply.user?.fullName || reply.user?.username || 'Ẩn danh'}
+                      </div>
+                      <div style={{ color: '#888', fontSize: '11px' }}>
+                        {timeAgo(reply.createdAt)}
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {isLoggedIn && reply.user?._id === currentUserId && (
+                    <button
+                      onClick={() => handleDeleteComment(reply._id)}
+                      style={{
+                        padding: '2px 8px',
+                        background: '#fff',
+                        border: '1px solid #e84c61',
+                        borderRadius: '3px',
+                        fontSize: '11px',
+                        cursor: 'pointer',
+                        color: '#e84c61'
+                      }}
+                    >
+                      Xóa
+                    </button>
+                  )}
+                </div>
+                
+                <div style={{ color: '#2d4a67', fontSize: '13px', marginTop: '6px', marginLeft: '40px' }}>
+                  {reply.content}
+                </div>
+                
+                <button
+                  onClick={() => handleLikeComment(reply._id)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    cursor: isLoggedIn ? 'pointer' : 'not-allowed',
+                    fontSize: '12px',
+                    color: reply.likes?.some(like => like._id === currentUserId) ? '#e84c61' : '#888',
+                    marginTop: '6px',
+                    marginLeft: '40px'
+                  }}
+                >
+                  ❤️ {reply.likes?.length || 0}
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    ))
+  ) : (
+    <div style={{ textAlign: 'center', padding: '40px', color: '#888' }}>
+      Chưa có bình luận nào. Hãy là người đầu tiên!
+    </div>
+  )}
+</div>
+}
+                    </div>
+                  ))
+                ) : (
+                  <div style={{ textAlign: 'center', padding: '40px', color: '#888' }}>
+                    Chưa có bình luận nào. Hãy là người đầu tiên!
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* RIGHT COLUMN: SIDEBAR */}
+          <div style={{ flex: '1' }}>
+            <div style={{
+              background: '#fff',
+              borderRadius: '8px',
+              padding: '25px',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+              position: 'sticky',
+              top: '150px'
+            }}>
+              {/* Document Title */}
+              <h2 style={{ color: '#133a5c', fontSize: '22px', marginBottom: '15px' }}>
+                {document.title}
+              </h2>
+
+              {/* ✅ THÊM: Badge tài liệu trả phí */}
+              {document.isPaid && (
+                <div style={{
+                  background: 'linear-gradient(135deg, #e84c61 0%, #ff6b7a 100%)',
+                  color: '#fff',
+                  padding: '12px',
+                  borderRadius: '8px',
+                  marginBottom: '15px',
+                  textAlign: 'center',
+                  fontWeight: 'bold',
+                  fontSize: '16px',
+                  boxShadow: '0 4px 12px rgba(232, 76, 97, 0.3)'
+                }}>
+                  💰 Tài liệu trả phí
+                  <div style={{ fontSize: '20px', marginTop: '5px' }}>
+                    {document.price} DP
+                  </div>
+                </div>
+              )}
+
+              {/* ✅ THÊM: Badge đã mua */}
+              {document.isPaid && isPurchased && (
+                <div style={{
+                  background: '#d4edda',
+                  color: '#155724',
+                  border: '2px solid #c3e6cb',
+                  padding: '12px',
+                  borderRadius: '8px',
+                  marginBottom: '15px',
+                  textAlign: 'center',
+                  fontWeight: 'bold'
+                }}>
+                  ✅ Đã mua tài liệu
+                </div>
+              )}
+              
+              {/* Statistics */}
+              <div style={{ 
+                display: 'flex', 
+                gap: '20px', 
+                marginBottom: '20px', 
+                paddingBottom: '20px', 
+                borderBottom: '1px solid #eee' 
+              }}>
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#133a5c' }}>
+                    {document.downloads || 0}
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#888' }}>Lượt tải</div>
+                </div>
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#133a5c' }}>
+                    {document.views || 0}
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#888' }}>Lượt xem</div>
+                </div>
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#133a5c' }}>
+                    {document.fileSize ? (document.fileSize / (1024*1024)).toFixed(1) : '0'}
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#888' }}>MB</div>
+                </div>
+              </div>
+
+              {/* Document Info */}
+              <InfoRow label="Người đăng" value={document.uploadedBy?.username || 'Ẩn danh'} />
+              <InfoRow label="Ngày đăng" value={document.uploadDate ? new Date(document.uploadDate).toLocaleDateString('vi-VN') : ''} />
+              <InfoRow label="Danh mục" value={document.category} />
+              
+              {/* Rating Section - giữ nguyên */}
+              <div style={{ marginBottom: '20px', paddingBottom: '20px', borderBottom: '1px solid #eee' }}>
+                <div style={{ fontSize: '14px', color: '#133a5c', marginBottom: '10px', fontWeight: 'bold' }}>
+                  ⭐ Đánh giá tài liệu
+                </div>
+                
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '15px' }}>
+                  <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#133a5c' }}>
+                    {document.averageRating || '0.0'}
+                  </div>
+                  <div>
+                    {'⭐'.repeat(Math.round(document.averageRating || 0))}
+                    {'☆'.repeat(5 - Math.round(document.averageRating || 0))}
+                  </div>
+                </div>
+
+                <div style={{ fontSize: '13px', color: '#666', marginBottom: '8px' }}>
+                  {userRating > 0 ? `Bạn đã đánh giá ${userRating} sao` : (isLoggedIn ? 'Đánh giá của bạn:' : 'Đăng nhập để đánh giá')}
+                </div>
+                
+                <div style={{ 
+                  display: 'flex', 
+                  gap: '5px',
+                  justifyContent: 'center',
+                  marginTop: '10px'
+                }}>
+                  {renderStars()}
+                </div>
+              </div>
+
+              {/* Tags */}
+              <div style={{ marginBottom: '20px' }}>
+                <div style={{ fontSize: '14px', color: '#133a5c', marginBottom: '10px', fontWeight: 'bold' }}>
+                  Tags
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                  {(document.tags || []).filter(Boolean).map((tag, idx) => (
+                    <span key={idx} style={{
+                      background: '#e8f4f8',
+                      color: '#133a5c',
+                      padding: '5px 12px',
+                      borderRadius: '15px',
+                      fontSize: '12px',
+                      cursor: 'pointer'
+                    }}>
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <button onClick={handleDownload} style={{
+                width: '100%',
+                padding: '12px',
+                background: '#0d7a4f',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '6px',
+                fontSize: '15px',
+                fontWeight: 'bold',
+                cursor: 'pointer',
+                marginBottom: '10px'
+              }}>
+                📥 Tải xuống
+              </button>
+
+              <button 
+                onClick={handleSave}
+                disabled={savingDocument}
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  background: isSaved ? '#ffc107' : '#4ba3d6',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '6px',
+                  fontSize: '15px',
+                  fontWeight: 'bold',
+                  cursor: savingDocument ? 'not-allowed' : 'pointer',
+                  marginBottom: '10px'
+                }}
+              >
+                {savingDocument ? '⏳ Đang xử lý...' : (isSaved ? '⭐ Đã lưu' : '💾 Lưu tài liệu')}
+              </button>
+
+              {/* ✅ THÊM: Nút mua tài liệu */}
+              {document.isPaid && !isPurchased && (
+                <button
+                  onClick={() => setShowPurchaseModal(true)}
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    background: 'linear-gradient(135deg, #e84c61 0%, #ff6b7a 100%)',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: '6px',
+                    fontSize: '15px',
+                    fontWeight: 'bold',
+                    cursor: 'pointer',
+                    marginBottom: '10px',
+                    boxShadow: '0 4px 12px rgba(232, 76, 97, 0.3)'
+                  }}
+                >
+                  💳 Mua tài liệu ({document.price} DP)
+                </button>
+              )}
+            </div>
+          </div>
         </div>
       </div>
-    )}
 
-    {/* ✅ Rating Success Popup */}
-    {showRatingPopup && (
-      <div style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        background: 'rgba(0,0,0,0.5)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 10000
-      }}>
+      {/* ✅ THÊM: Purchase Modal */}
+      <PurchaseModal
+        isOpen={showPurchaseModal}
+        onClose={() => setShowPurchaseModal(false)}
+        onConfirm={handlePurchase}
+        document={document}
+        userCoins={userCoins}
+      />
+
+      {/* Popup đánh giá */}
+      {showRatingPopup && (
         <div style={{
+          position: 'fixed',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
           background: '#fff',
-          borderRadius: '12px',
           padding: '30px',
-          boxShadow: '0 6px 30px rgba(0,0,0,0.2)',
-          textAlign: 'center',
-          maxWidth: '400px'
+          borderRadius: '12px',
+          boxShadow: '0 8px 32px rgba(0,0,0,0.2)',
+          zIndex: 9999,
+          textAlign: 'center'
         }}>
-          <div style={{ fontSize: '64px', marginBottom: '20px' }}>⭐</div>
-          <h3 style={{ color: '#133a5c', marginBottom: '15px', fontSize: '20px' }}>
-            Đánh giá thành công!
-          </h3>
-          <p style={{ color: '#666', marginBottom: '25px', fontSize: '16px' }}>
-            {ratingMessage}
-          </p>
+          <h3 style={{ color: '#133a5c', marginBottom: '15px' }}>✅ Cảm ơn bạn!</h3>
+          <p style={{ color: '#2d4a67', marginBottom: '20px' }}>{ratingMessage}</p>
           <button
             onClick={() => setShowRatingPopup(false)}
             style={{
-              padding: '12px 40px',
+              padding: '10px 30px',
               background: '#4ba3d6',
               color: '#fff',
               border: 'none',
               borderRadius: '6px',
-              fontSize: '16px',
+              fontSize: '14px',
               fontWeight: 'bold',
               cursor: 'pointer'
             }}
           >
-            OK
+            Đóng
           </button>
         </div>
-      </div>
-    )}
-  </div>
-);
+      )}
 
-}
-
-function InfoRow({ label, value }) {
-  return (
-    <div style={{
-      display: 'flex',
-      justifyContent: 'space-between',
-      marginBottom: '12px',
-      fontSize: '14px'
-    }}>
-      <span style={{ color: '#888' }}>{label}:</span>
-      <span style={{ color: '#133a5c', fontWeight: '500' }}>{value}</span>
+      {/* Popup chỉnh sửa */}
+      {showEditPopup && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0,0,0,0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 9999
+        }}>
+          <div style={{
+            background: '#fff',
+            padding: '30px',
+            borderRadius: '12px',
+            width: '500px',
+            maxWidth: '90%'
+          }}>
+            <h3 style={{ marginBottom: '20px' }}>Chỉnh sửa tài liệu</h3>
+            <input
+              value={editTitle}
+              onChange={(e) => setEditTitle(e.target.value)}
+              placeholder="Tiêu đề"
+              style={{
+                width: '100%',
+                padding: '10px',
+                marginBottom: '15px',
+                border: '1px solid #ccc',
+                borderRadius: '6px',
+                boxSizing: 'border-box'
+              }}
+            />
+            <textarea
+              value={editDesc}
+              onChange={(e) => setEditDesc(e.target.value)}
+              placeholder="Mô tả"
+              rows="4"
+              style={{
+                width: '100%',
+                padding: '10px',
+                marginBottom: '15px',
+                border: '1px solid #ccc',
+                borderRadius: '6px',
+                boxSizing: 'border-box'
+              }}
+            />
+            <input
+              type="file"
+              onChange={handleFileChange}
+              style={{ marginBottom: '15px' }}
+            />
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button
+                onClick={handleEditSubmit}
+                style={{
+                  flex: 1,
+                  padding: '12px',
+                  background: '#0d7a4f',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: 'pointer'
+                }}
+              >
+                Lưu
+              </button>
+              <button
+                onClick={() => setShowEditPopup(false)}
+                style={{
+                  flex: 1,
+                  padding: '12px',
+                  background: '#ccc',
+                  color: '#333',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: 'pointer'
+                }}
+              >
+                Hủy
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
+// Helper component
+function InfoRow({ label, value }) {
+  return (
+    <div style={{ marginBottom: '15px' }}>
+      <div style={{ color: '#888', fontSize: '13px', marginBottom: '5px' }}>{label}</div>
+      <div style={{ color: '#133a5c', fontSize: '15px', fontWeight: 'bold' }}>
+        {value}
+      </div>
+    </div>
+  );
+}

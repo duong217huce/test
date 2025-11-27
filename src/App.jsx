@@ -10,6 +10,7 @@ import RegisterPage from './components/RegisterPage';
 import SavedPage from './components/SavedPage';
 import Chatbot from './components/Chatbot';
 import SearchPage from './components/SearchPage';  
+import RechargePage from './components/RechargePage';
 
 function App() {
   return (
@@ -41,6 +42,8 @@ function App() {
 
         {/* Trang tìm kiếm */}
         <Route path="/search" element={<SearchPage />} />
+        {/* Trang nạp tiền */}
+        <Route path="/recharge" element={<RechargePage />} />
       </Routes>
       
       {/* ✅ Chatbot nổi - hiển thị trên TẤT CẢ các trang */}

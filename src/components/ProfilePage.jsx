@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import Header from './Header';
+import { refreshUserData } from '../utils/userUtils';
 
 const cardStyle = {
   background: '#b4cbe0',
@@ -13,15 +14,7 @@ const cardStyle = {
   color: '#fff',
   fontSize: '14px'
 };
-
-const hocCapList = [
-  '',
-  'Tiểu học',
-  'THCS',
-  'THPT',
-  'Đại học',
-  'Sau đại học'
-];
+const hocCapList = ['', 'Tiểu học', 'THCS', 'THPT', 'Đại học', 'Sau đại học'];
 
 export default function ProfilePage() {
   const navigate = useNavigate();
@@ -44,33 +37,31 @@ export default function ProfilePage() {
   const [uploadedDocs, setUploadedDocs] = useState([]);
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false); // THÊM
   const fileInputRef = useRef(null);
 
   useEffect(() => {
-    // Check if user is logged in
     const isLoggedIn = localStorage.getItem('isLoggedIn') === 'true';
     if (!isLoggedIn) {
       alert('Vui lòng đăng nhập để xem trang cá nhân');
       navigate('/login');
       return;
     }
-    // Get user data from localStorage
     const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
-    const avatar = localStorage.getItem('avatarUrl') || '';
     setUserData({
-      username: localStorage.getItem('username') || storedUser.username || '',
-      fullName: localStorage.getItem('fullName') || storedUser.fullName || '',
+      username: storedUser.username || '',
+      fullName: storedUser.fullName || '',
       email: storedUser.email || '',
-      phone: localStorage.getItem('phone') || '',
+      phone: storedUser.phone || '',
       joinDate: new Date(storedUser.createdAt || Date.now()).toLocaleDateString('vi-VN'),
       totalUploads: 0,
       totalDownloads: 0,
       totalViews: 0,
-      bio: storedUser.bio || 'Thành viên của EDUCONNECT',
-      avatar: avatar,
-      hocCap: localStorage.getItem('hocCap') || '',
-      lop: localStorage.getItem('lop') || '',
-      chuyenNganh: localStorage.getItem('chuyenNganh') || ''
+      bio: storedUser.bio || '',
+      avatar: localStorage.getItem('avatarUrl') || '',
+      hocCap: storedUser.hocCap || '',
+      lop: storedUser.lop || '',
+      chuyenNganh: storedUser.chuyenNganh || ''
     });
     fetchUploadedDocs();
   }, [navigate]);
@@ -90,7 +81,7 @@ export default function ProfilePage() {
       });
       const allDocs = await response.json();
       const myDocs = allDocs.filter(doc =>
-        doc.uploadedBy && (doc.uploadedBy._id === user._id || doc.uploadedBy === user.id)
+        doc.uploadedBy && (doc.uploadedBy._id === user._id || doc.uploadedBy._id === user.id || doc.uploadedBy === user.id)
       );
       setUploadedDocs(myDocs);
       setUserData(prev => ({
@@ -106,30 +97,105 @@ export default function ProfilePage() {
     }
   };
 
-  // Ảnh đại diện
-  const handleAvatarChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = evt => {
-        setUserData(prev => ({ ...prev, avatar: evt.target.result }));
-      };
-      reader.readAsDataURL(file);
+  const handleAvatarChange = async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  try {
+    const formData = new FormData();
+    formData.append('avatar', file);
+
+    const token = localStorage.getItem('token');
+    const response = await fetch('http://localhost:5000/api/users/avatar', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      },
+      body: formData
+    });
+
+    if (!response.ok) {
+      throw new Error('Upload failed');
     }
+
+    const data = await response.json();
+    const fullAvatarUrl = `http://localhost:5000${data.avatarUrl}`;
+    
+    console.log('✅ Avatar uploaded:', fullAvatarUrl);
+    
+    // Cập nhật state
+    setUserData(prev => ({ ...prev, avatar: fullAvatarUrl }));
+    
+    // Cập nhật localStorage
+    const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+    currentUser.avatar = data.avatarUrl;
+    localStorage.setItem('user', JSON.stringify(currentUser));
+    
+    alert('Đã cập nhật ảnh đại diện!');
+  } catch (error) {
+    console.error('❌ Error uploading avatar:', error);
+    alert('Có lỗi khi upload ảnh đại diện!');
+  }
   };
 
-  // Lưu thông tin sửa đổi
-  const handleEdit = () => {
-    if (isEditing) {
-      // Lưu về localStorage (hoặc gọi API nếu backend support)
-      localStorage.setItem('fullName', userData.fullName);
-      localStorage.setItem('avatarUrl', userData.avatar || '');
-      localStorage.setItem('hocCap', userData.hocCap);
-      localStorage.setItem('lop', userData.lop);
-      localStorage.setItem('chuyenNganh', userData.chuyenNganh);
-      alert('Đã lưu thông tin hồ sơ!');
+  const handleEdit = async () => {
+  if (isEditing) {
+    if (isSaving) {
+      console.log('⚠️ Đang lưu...');
+      return;
     }
-    setIsEditing(val => !val);
+    setIsSaving(true);
+    try {
+      const token = localStorage.getItem('token');
+      const dataToSend = {
+        fullName: userData.fullName,
+        hocCap: userData.hocCap,
+        lop: userData.lop,
+        chuyenNganh: userData.chuyenNganh,
+        phone: userData.phone,
+        bio: userData.bio
+      };
+
+      const response = await fetch('http://localhost:5000/api/users/me', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(dataToSend)
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to update');
+      }
+
+      // ✅ SỬ DỤNG HELPER
+      await refreshUserData();
+      
+      // ✅ Fetch lại để cập nhật UI
+      const updatedUser = await response.json();
+      setUserData(prev => ({
+        ...prev,
+        fullName: updatedUser.fullName,
+        hocCap: updatedUser.hocCap,
+        lop: updatedUser.lop,
+        chuyenNganh: updatedUser.chuyenNganh,
+        phone: updatedUser.phone,
+        bio: updatedUser.bio
+      }));
+      
+      alert('✅ Đã lưu thông tin hồ sơ!');
+      setIsEditing(false);
+    } catch (err) {
+      console.error('❌ Error updating profile:', err);
+      alert('Có lỗi khi lưu thông tin: ' + err.message);
+    } finally {
+      setIsSaving(false);
+    }
+  } else {
+    setIsEditing(true);
+  }
   };
 
   return (
@@ -139,38 +205,21 @@ export default function ProfilePage() {
       <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '20px' }}>
         <div style={{ display: 'flex', gap: '30px' }}>
           {/* SIDEBAR */}
-          <aside style={{
-            width: '300px',
-            flexShrink: 0
-          }}>
+          <aside style={{ width: '300px', flexShrink: 0 }}>
             <div style={{
-              background: '#fff',
-              borderRadius: '8px',
-              padding: '30px',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
-              textAlign: 'center',
-              position: 'sticky',
-              top: '150px'
+              background: '#fff', borderRadius: '8px', padding: '30px',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.06)', textAlign: 'center', position: 'sticky', top: '150px'
             }}>
               {/* Avatar */}
               <div style={{
-                width: '120px',
-                height: '120px',
-                borderRadius: '50%',
-                background: '#b4cbe0',
-                margin: '0 auto 20px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: '48px',
-                color: '#fff',
-                overflow: 'hidden'
+                width: '120px', height: '120px', borderRadius: '50%', background: '#b4cbe0',
+                margin: '0 auto 20px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: '48px', color: '#fff', overflow: 'hidden'
               }}>
                 {userData.avatar ?
                   (<img src={userData.avatar} alt="Avatar" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />)
                   : "👤"}
               </div>
-              {/* Chỉnh ảnh đại diện */}
               {isEditing &&
                 <div style={{ marginBottom: 15 }}>
                   <input
@@ -182,20 +231,15 @@ export default function ProfilePage() {
                   />
                 </div>
               }
-              {/* User name */}
               <h2 style={{ color: '#133a5c', fontSize: '22px', marginBottom: '5px' }}>
                 {userData.fullName || userData.username}
               </h2>
               <p style={{ color: '#888', fontSize: '14px', marginBottom: '20px' }}>
                 @{userData.username}
               </p>
-              {/* Stats */}
               <div style={{
-                display: 'flex',
-                justifyContent: 'space-around',
-                padding: '20px 0',
-                borderTop: '1px solid #eee',
-                borderBottom: '1px solid #eee',
+                display: 'flex', justifyContent: 'space-around',
+                padding: '20px 0', borderTop: '1px solid #eee', borderBottom: '1px solid #eee',
                 marginBottom: '20px'
               }}>
                 <div style={{ textAlign: 'center' }}>
@@ -217,41 +261,34 @@ export default function ProfilePage() {
                   <div style={{ fontSize: '12px', color: '#888' }}>Lượt xem</div>
                 </div>
               </div>
-              {/* Member since */}
-              <p style={{
-                fontSize: '13px',
-                color: '#888',
-                marginBottom: '20px'
-              }}>
+              <p style={{ fontSize: '13px', color: '#888', marginBottom: '20px' }}>
                 Tham gia: {userData.joinDate}
               </p>
-              {/* Edit button */}
+              {/* Button chỉnh sửa/lưu */}
               <button
                 onClick={handleEdit}
+                disabled={isSaving}
                 style={{
                   width: '100%',
                   padding: '12px',
-                  background: isEditing ? '#0d7a4f' : '#4ba3d6',
+                  background: isSaving ? '#ccc' : isEditing ? '#0d7a4f' : '#4ba3d6',
                   color: '#fff',
                   border: 'none',
                   borderRadius: '6px',
                   fontSize: '14px',
                   fontWeight: 'bold',
-                  cursor: 'pointer',
+                  cursor: isSaving ? 'not-allowed' : 'pointer',
                   marginBottom: '10px'
                 }}
               >
-                {isEditing ? '💾 Lưu thay đổi' : '✏️ Chỉnh sửa'}
+                {isSaving ? '⏳ Đang lưu...' : (isEditing ? '💾 Lưu thay đổi' : '✏️ Chỉnh sửa')}
               </button>
             </div>
           </aside>
           {/* MAIN CONTENT */}
           <div style={{ flex: 1 }}>
             <div style={{
-              display: 'flex',
-              gap: '20px',
-              marginBottom: '30px',
-              borderBottom: '2px solid #eee'
+              display: 'flex', gap: '20px', marginBottom: '30px', borderBottom: '2px solid #eee'
             }}>
               <button
                 onClick={() => setActiveTab('info')}
@@ -259,8 +296,7 @@ export default function ProfilePage() {
                   padding: '12px 24px',
                   background: 'none',
                   border: 'none',
-                  borderBottom: activeTab === 'info' ?
-                    '3px solid #4ba3d6' : '3px solid transparent',
+                  borderBottom: activeTab === 'info' ? '3px solid #4ba3d6' : '3px solid transparent',
                   color: activeTab === 'info' ? '#133a5c' : '#888',
                   fontSize: '16px',
                   fontWeight: activeTab === 'info' ? 'bold' : 'normal',
@@ -276,8 +312,7 @@ export default function ProfilePage() {
                   padding: '12px 24px',
                   background: 'none',
                   border: 'none',
-                  borderBottom: activeTab === 'uploads' ?
-                    '3px solid #4ba3d6' : '3px solid transparent',
+                  borderBottom: activeTab === 'uploads' ? '3px solid #4ba3d6' : '3px solid transparent',
                   color: activeTab === 'uploads' ? '#133a5c' : '#888',
                   fontSize: '16px',
                   fontWeight: activeTab === 'uploads' ? 'bold' : 'normal',
@@ -288,7 +323,6 @@ export default function ProfilePage() {
                 Tài liệu đã tải lên ({uploadedDocs.length})
               </button>
             </div>
-            {/* TAB CONTENT */}
             {activeTab === 'info' ? (
               <div style={{
                 background: '#fff',
@@ -311,7 +345,7 @@ export default function ProfilePage() {
                 <InfoField
                   label="Email"
                   value={userData.email}
-                  isEditing={isEditing}
+                  isEditing={false}
                   onChange={val => setUserData(prev => ({ ...prev, email: val }))}
                 />
                 <InfoField
@@ -320,7 +354,6 @@ export default function ProfilePage() {
                   isEditing={isEditing}
                   onChange={val => setUserData(prev => ({ ...prev, phone: val }))}
                 />
-                {/* Thông tin học tập */}
                 <div style={{ marginBottom: '20px' }}>
                   <label style={{
                     display: 'block',
@@ -372,7 +405,6 @@ export default function ProfilePage() {
                   onChange={val => setUserData(prev => ({ ...prev, chuyenNganh: val }))}
                   placeholder="Nếu bạn là sinh viên"
                 />
-                {/* Bio */}
                 <div style={{ marginTop: '20px' }}>
                   <label style={{
                     display: 'block',
@@ -385,7 +417,7 @@ export default function ProfilePage() {
                   </label>
                   {isEditing ? (
                     <textarea
-                      defaultValue={userData.bio}
+                      value={userData.bio}
                       rows="4"
                       onChange={e => setUserData(prev => ({ ...prev, bio: e.target.value }))}
                       style={{
@@ -508,42 +540,30 @@ export default function ProfilePage() {
   );
 }
 
-// Helper
-function InfoField({ label, value, isEditing, onChange = () => { }, placeholder }) {
+function InfoField({ label, value, isEditing, onChange = () => {}, placeholder }) {
   return (
     <div style={{ marginBottom: '20px' }}>
       <label style={{
-        display: 'block',
-        marginBottom: '8px',
-        color: '#133a5c',
-        fontSize: '14px',
-        fontWeight: '500'
+        display: 'block', marginBottom: '8px', color: '#133a5c',
+        fontSize: '14px', fontWeight: '500'
       }}>
         {label}
       </label>
       {isEditing ? (
         <input
           type="text"
-          defaultValue={value}
+          value={value}
           placeholder={placeholder || ''}
           onChange={e => onChange(e.target.value)}
           style={{
-            width: '100%',
-            padding: '12px',
-            fontSize: '14px',
-            border: '1px solid #ccc',
-            borderRadius: '6px',
-            outline: 'none',
-            boxSizing: 'border-box'
+            width: '100%', padding: '12px', fontSize: '14px',
+            border: '1px solid #ccc', borderRadius: '6px', outline: 'none', boxSizing: 'border-box'
           }}
         />
       ) : (
         <div style={{
-          padding: '12px',
-          background: '#f5f5f5',
-          borderRadius: '6px',
-          color: '#2d4a67',
-          fontSize: '14px'
+          padding: '12px', background: '#f5f5f5', borderRadius: '6px',
+          color: '#2d4a67', fontSize: '14px'
         }}>
           {value || 'Chưa cập nhật'}
         </div>
