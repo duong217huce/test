@@ -13,6 +13,7 @@ const ratingRoutes = require('./routes/ratings');
 const userRoutes = require('./routes/users');
 const quizRoutes = require('./routes/quizzes');
 const adminRoutes = require('./routes/admin');
+const reportRoutes = require('./routes/reports');
 
 const app = express();
 
@@ -23,7 +24,6 @@ app.use(cors({
 }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-// ❌ XÓA DÒNG NÀY: app.use('/api/admin', adminRoutes);
 
 // ==================== FILE SYSTEM SETUP ====================
 const uploadsDir = path.join(__dirname, 'uploads');
@@ -109,7 +109,8 @@ app.use('/api/comments', commentRoutes);
 app.use('/api/ratings', ratingRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/quizzes', quizRoutes);
-app.use('/api/admin', adminRoutes); // ✅ DI CHUYỂN VÀO ĐÂY
+app.use('/api/admin', adminRoutes);
+app.use('/api/reports', reportRoutes);
 
 // ==================== UTILITY ENDPOINTS ====================
 
@@ -172,6 +173,7 @@ app.get('/', (req, res) => {
       users: '/api/users',
       quizzes: '/api/quizzes',
       admin: '/api/admin',
+      reports: '/api/reports',
       uploads: '/uploads',
       covers: '/uploads/covers',
       quizCovers: '/uploads/quiz-covers',
@@ -264,11 +266,18 @@ const server = app.listen(PORT, () => {
   console.log('   - POST   /api/quizzes/:id/start');
   console.log('   - POST   /api/quizzes/:id/submit');
   console.log('');
-  console.log('👑 Admin:'); // ✅ THÊM
+  console.log('👑 Admin:');
   console.log('   - GET    /api/admin/statistics');
   console.log('   - GET    /api/admin/users');
   console.log('   - GET    /api/admin/users/:userId/documents');
   console.log('   - PUT    /api/admin/users/:userId/coins');
+  console.log('   - GET    /api/admin/reports');
+  console.log('   - PUT    /api/admin/reports/:id/mark-read');
+  console.log('   - DELETE /api/admin/reports/:id');
+  console.log('');
+  console.log('🚨 Reports:');
+  console.log('   - POST   /api/reports/document');
+  console.log('   - POST   /api/reports/comment');
   console.log('');
   console.log('📁 Files:');
   console.log('   - GET    /uploads/:filename (preview)');
