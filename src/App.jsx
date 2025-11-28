@@ -11,6 +11,14 @@ import SavedPage from './components/SavedPage';
 import Chatbot from './components/Chatbot';
 import SearchPage from './components/SearchPage';  
 import RechargePage from './components/RechargePage';
+import QuizListPage from './components/QuizListPage';
+import CreateQuizPage from './components/CreateQuizPage';
+import QuizDetailPage from './components/QuizDetailPage';
+import TakeQuizPage from './components/TakeQuizPage';
+import QuizResultPage from './components/QuizResultPage';
+import Toast from './components/Toast';
+import AdminDashboard from './components/AdminDashboard';
+
 
 function App() {
   return (
@@ -42,12 +50,32 @@ function App() {
 
         {/* Trang tìm kiếm */}
         <Route path="/search" element={<SearchPage />} />
+        
         {/* Trang nạp tiền */}
         <Route path="/recharge" element={<RechargePage />} />
+        
+        {/* ✅ QUIZ ROUTES - ĐÃ SỬA */}
+        {/* Trang danh sách đề thi */}
+        <Route path="/quiz" element={<QuizListPage />} />
+        
+        {/* Trang tạo đề thi */}
+        <Route path="/quiz/create" element={<CreateQuizPage />} />
+        
+        {/* Trang chi tiết đề thi */}
+        <Route path="/quiz/:id" element={<QuizDetailPage />} />
+        
+        {/* Trang làm đề thi */}
+        <Route path="/quiz/:id/take" element={<TakeQuizPage />} />
+        
+        {/* Trang kết quả đề thi */}
+        <Route path="/quiz/:id/result" element={<QuizResultPage />} />
+        
+        <Route path="/admin" element={<AdminDashboard />} />
       </Routes>
       
       {/* ✅ Chatbot nổi - hiển thị trên TẤT CẢ các trang */}
       <Chatbot />
+      <Toast />
     </BrowserRouter>
   );
 }

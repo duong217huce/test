@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { colors } from '../theme/colors';
+import { showToast } from '../utils/toast';
 
 const menuItems = [
   'Giáo dục phổ thông',
@@ -16,7 +18,7 @@ const menuRoutes = {
   'Văn học - Truyện chữ': '/category/Văn học - Truyện chữ',
   'Văn mẫu - Biểu mẫu': '/category/Văn mẫu - Biểu mẫu',
   'Luận văn - Báo Cáo': '/category/Luận văn - Báo Cáo',
-  'Ôn tập trắc nghiệm': '/category/Ôn tập trắc nghiệm'
+  'Ôn tập trắc nghiệm': '/quiz'
 };
 
 const menuDropdowns = {
@@ -49,12 +51,6 @@ const menuDropdowns = {
     'Báo cáo': ['Thực tập', 'Nghiên cứu', 'Tiểu luận'],
     'Đề tài': ['Khoa học tự nhiên', 'Khoa học xã hội'],
     'Tài liệu tham khảo': ['Cách viết', 'Format', 'Trích dẫn']
-  },
-  'Ôn tập trắc nghiệm': {
-    'THPT Quốc gia': ['Toán', 'Văn', 'Anh', 'Lý', 'Hóa', 'Sinh'],
-    'Đại học': ['Đề thi thử', 'Luyện thi'],
-    'Chứng chỉ': ['TOEIC', 'IELTS', 'HSK', 'JLPT'],
-    'Thi công chức': ['Luật', 'Hành chính', 'Kinh tế']
   }
 };
 
@@ -68,7 +64,6 @@ export default function Header() {
   const [activeDropdown, setActiveDropdown] = useState(null);
   const userMenuRef = useRef(null);
 
-  // State cho tìm kiếm
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -87,7 +82,6 @@ export default function Header() {
     setUserCoins(parseInt(coins));
   }, []);
 
-  // Debounce search
   useEffect(() => {
     if (searchQuery.trim() === '') {
       setSearchResults([]);
@@ -103,7 +97,6 @@ export default function Header() {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  // Đóng suggestions khi click bên ngoài
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (searchRef.current && !searchRef.current.contains(event.target)) {
@@ -125,7 +118,7 @@ export default function Header() {
       setShowSuggestions(true);
       setIsSearching(false);
     } catch (err) {
-      console.error('❌ Error searching:', err);
+      console.error('Error searching:', err);
       setIsSearching(false);
     }
   };
@@ -151,12 +144,13 @@ export default function Header() {
     setUsername('');
     setUserCoins(0);
     setShowDropdown(false);
+    showToast('Đã đăng xuất thành công', 'success');
     navigate('/');
   };
 
   const handleProtectedAction = (actionName) => {
     if (!isLoggedIn) {
-      alert(`Bạn cần đăng nhập để sử dụng chức năng ${actionName}!`);
+      showToast(`Bạn cần đăng nhập để sử dụng chức năng ${actionName}`, 'warning');
     }
   };
 
@@ -172,426 +166,485 @@ export default function Header() {
       left: 0,
       right: 0,
       zIndex: 1000,
-      background: '#eafcff',
-      boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+      background: colors.background,
+      boxShadow: '0 2px 8px rgba(9, 64, 103, 0.08)',
+      borderBottom: `1px solid ${colors.borderLight}`
     }}>
-      {/* Header chính */}
-      <header style={{
-        display: 'flex',
-        alignItems: 'center',
-        padding: '18px 0',
+      {/* Container chung - căn giữa */}
+      <div style={{ 
         maxWidth: '1200px',
         margin: '0 auto',
-        paddingLeft: '16px',
-        paddingRight: '16px'
+        paddingLeft: '20px',
+        paddingRight: '20px'
       }}>
-        {/* Logo */}
-        <Link 
-          to="/" 
-          style={{ 
-            color: '#e84c61', 
-            fontWeight: 'bold', 
-            fontSize: '22px', 
-            marginRight: '32px', 
-            textDecoration: 'none',
-            transition: 'transform 0.2s'
-          }}
-          onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.05)'}
-          onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}
-        >
-          📚 EDUCONNECT
-        </Link>
-
-        {/* Search Box */}
-        <div style={{ flex: 1, position: 'relative' }} ref={searchRef}>
-          <form onSubmit={handleSearchSubmit} style={{ position: 'relative' }}>
-            <input
-              type="text"
-              placeholder="Tìm kiếm tài liệu..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              onFocus={() => searchResults.length > 0 && setShowSuggestions(true)}
-              style={{
-                height: '36px',
-                width: '100%',
-                maxWidth: '400px',
-                fontSize: '15px',
-                borderRadius: '20px',
-                border: '1px solid #ccc',
-                paddingLeft: '18px',
-                paddingRight: '45px',
-                outline: 'none'
-              }}
-            />
-            <button
-              type="submit"
-              style={{
-                position: 'absolute',
-                right: '8px',
-                top: '50%',
-                transform: 'translateY(-50%)',
-                background: 'none',
-                border: 'none',
-                cursor: 'pointer',
-                fontSize: '20px',
-                padding: '5px'
-              }}
-            >
-              🔍
-            </button>
-          </form>
-
-          {/* Search Suggestions */}
-          {showSuggestions && searchResults.length > 0 && (
-            <div style={{
-              position: 'absolute',
-              top: '100%',
-              left: 0,
-              right: 0,
-              marginTop: '8px',
-              background: '#fff',
-              borderRadius: '10px',
-              boxShadow: '0 6px 25px rgba(0,0,0,0.15)',
-              maxHeight: '400px',
-              maxWidth: '400px',
-              overflowY: 'auto',
-              zIndex: 1001
-            }}>
-              {searchResults.map((doc) => (
-                <div
-                  key={doc._id}
-                  onClick={() => handleSuggestionClick(doc._id)}
-                  style={{
-                    padding: '12px 16px',
-                    borderBottom: '1px solid #eee',
-                    cursor: 'pointer',
-                    transition: 'background 0.2s',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '12px'
-                  }}
-                  onMouseOver={(e) => e.currentTarget.style.background = '#f5f5f5'}
-                  onMouseOut={(e) => e.currentTarget.style.background = '#fff'}
-                >
-                  <div style={{ fontSize: '20px' }}>📄</div>
-                  <div style={{ flex: 1, textAlign: 'left' }}>
-                    <div style={{ fontWeight: 'bold', color: '#133a5c', fontSize: '14px', marginBottom: '3px' }}>
-                      {doc.title}
-                    </div>
-                    <div style={{ fontSize: '12px', color: '#666' }}>
-                      {doc.category} • {doc.views || 0} lượt xem
-                    </div>
-                  </div>
-                  <div style={{ fontSize: '18px', color: '#4ba3d6' }}>→</div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {isSearching && (
-            <div style={{
-              position: 'absolute',
-              top: '100%',
-              left: 0,
-              marginTop: '8px',
-              background: '#fff',
-              borderRadius: '10px',
-              padding: '15px',
-              maxWidth: '400px',
-              boxShadow: '0 6px 25px rgba(0,0,0,0.15)',
-              color: '#666',
-              fontSize: '14px'
-            }}>
-              Đang tìm kiếm...
-            </div>
-          )}
-        </div>
-
-        {/* Navigation */}
-        <nav style={{ 
-          display: 'flex', 
-          gap: '24px', 
-          marginLeft: '40px', 
-          fontSize: '16px', 
-          alignItems: 'center' 
+        
+        {/* Header chính */}
+        <header style={{
+          display: 'flex',
+          alignItems: 'center',
+          padding: '20px 0',
+          justifyContent: 'space-between'
         }}>
+          {/* Logo */}
           <Link 
-            to="/upload"
-            onClick={(e) => {
-              if (!isLoggedIn) {
-                e.preventDefault();
-                handleProtectedAction('Upload');
-              }
-            }}
+            to="/" 
             style={{ 
-              textDecoration: 'none', 
-              color: '#133a5c', 
-              fontWeight: '500',
-              transition: 'color 0.2s'
-            }}
-            onMouseOver={(e) => e.currentTarget.style.color = '#e84c61'}
-            onMouseOut={(e) => e.currentTarget.style.color = '#133a5c'}
-          >
-            📤 Upload
-          </Link>
-          
-          {isAdmin ? (
-            <Link
-              to="/admin"
-              style={{
-                padding: '7px 18px',
-                borderRadius: '20px',
-                background: '#fff3cd',
-                border: '2px solid #ffc107',
-                color: '#ff8c00',
-                fontWeight: 'bold',
-                fontSize: '14px',
-                textDecoration: 'none',
-                whiteSpace: 'nowrap'
-              }}
-            >
-              📊 Quản lý
-            </Link>
-          ) : (
-            isLoggedIn && (
-              <div 
-                onClick={() => navigate('/recharge')}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  padding: '6px 16px',
-                  background: '#fff3cd',
-                  borderRadius: '20px',
-                  border: '2px solid #ffc107',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s',
-                  whiteSpace: 'nowrap'
-                }}
-                onMouseOver={(e) => {
-                  e.currentTarget.style.background = '#ffc107';
-                  e.currentTarget.style.transform = 'scale(1.05)';
-                }}
-                onMouseOut={(e) => {
-                  e.currentTarget.style.background = '#fff3cd';
-                  e.currentTarget.style.transform = 'scale(1)';
-                }}
-                title="Nhấn để nạp tiền"
-              >
-                <span style={{ fontSize: '16px' }}>🪙</span>
-                <span style={{ fontWeight: 'bold', color: '#856404', fontSize: '14px' }}>
-                  {userCoins} DP
-                </span>
-              </div>
-            )
-          )}
-
-          <Link 
-            to="/saved"
-            onClick={(e) => {
-              if (!isLoggedIn) {
-                e.preventDefault();
-                handleProtectedAction('Saved');
-              }
-            }}
-            style={{ 
-              textDecoration: 'none', 
-              color: '#133a5c', 
-              fontWeight: '500',
+              color: colors.headline,
+              fontWeight: '800',
+              fontSize: '20px',
+              textDecoration: 'none',
               transition: 'color 0.2s',
-              whiteSpace: 'nowrap'
+              letterSpacing: '-0.5px',
+              flexShrink: 0
             }}
-            onMouseOver={(e) => e.currentTarget.style.color = '#e84c61'}
-            onMouseOut={(e) => e.currentTarget.style.color = '#133a5c'}
+            onMouseOver={(e) => e.currentTarget.style.color = colors.button}
+            onMouseOut={(e) => e.currentTarget.style.color = colors.headline}
           >
-            🔖 Đã lưu
+            EDUCONNECT
           </Link>
-          
-          {isLoggedIn ? (
-            <div
-              style={{ position: 'relative', display: 'inline-block' }}
-              ref={userMenuRef}
-            >
-              <span
-                style={{
-                  display: 'inline-block',
-                  width: 38,
-                  height: 38,
-                  borderRadius: '50%',
-                  background: (localStorage.getItem('avatarUrl') ?
-                    `url(${localStorage.getItem('avatarUrl')}) center/cover no-repeat`
-                    : '#4ba3d6'
-                  ),
-                  color: '#fff',
-                  fontWeight: 'bold',
-                  fontSize: '18px',
-                  textAlign: 'center',
-                  verticalAlign: 'middle',
-                  lineHeight: '38px',
-                  cursor: 'pointer',
-                  border: '2px solid #fff',
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.06)'
+
+          {/* Search Box */}
+          <div style={{ flex: 1, position: 'relative', maxWidth: '500px', marginLeft: '32px', marginRight: '32px' }} ref={searchRef}>
+            <form onSubmit={handleSearchSubmit} style={{ position: 'relative' }}>
+              <input
+                type="text"
+                placeholder="Tìm kiếm tài liệu..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onFocus={(e) => {
+                  if (searchResults.length > 0) setShowSuggestions(true);
+                  e.currentTarget.style.borderColor = colors.button;
+                  e.currentTarget.style.background = colors.background;
                 }}
-                onClick={() => setShowDropdown(prev => !prev)}
-                title={username}
-              >
-                {!localStorage.getItem('avatarUrl') && (username ? username[0].toUpperCase() : 'U')}
-              </span>
-              {showDropdown && (
-                <div style={{
-                  position: 'absolute',
-                  top: '110%',
-                  right: 0,
-                  background: '#fff',
-                  border: '1px solid #ddd',
+                onBlur={(e) => {
+                  setTimeout(() => {
+                    e.currentTarget.style.borderColor = colors.border;
+                    e.currentTarget.style.background = colors.inputBg;
+                  }, 200);
+                }}
+                style={{
+                  height: '44px',
+                  width: '100%',
+                  fontSize: '14px',
                   borderRadius: '8px',
-                  marginTop: '8px',
-                  minWidth: '180px',
-                  boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-                  zIndex: 1000
-                }}>
-                  <div style={{ padding: '12px 16px', borderBottom: '1px solid #eee', color: '#133a5c', fontWeight: 'bold' }}>
-                    {username}
-                  </div>
-                  <Link to="/profile" style={{
-                    display: 'block',
-                    padding: '12px 16px',
-                    textDecoration: 'none',
-                    color: '#133a5c',
-                    borderBottom: '1px solid #eee',
-                    transition: 'background 0.2s'
-                  }}
-                    onClick={() => setShowDropdown(false)}
-                    onMouseOver={e => e.currentTarget.style.background = '#f5f5f5'}
-                    onMouseOut={e => e.currentTarget.style.background = 'transparent'}
-                  >📋 Hồ sơ</Link>
-                  <button
-                    onClick={handleLogout}
-                    style={{
-                      width: '100%',
-                      padding: '12px 16px',
-                      textAlign: 'left',
-                      background: 'none',
-                      border: 'none',
-                      cursor: 'pointer',
-                      color: '#e84c61',
-                      fontSize: '16px',
-                      fontFamily: 'inherit',
-                      transition: 'background 0.2s'
-                    }}
-                    onMouseOver={e => e.target.style.background = '#f5f5f5'}
-                    onMouseOut={e => e.target.style.background = 'transparent'}
-                  >🚪 Đăng xuất
-                  </button>
-                </div>
-              )}
-            </div>
-          ) : (
-            <Link 
-              to="/login" 
-              style={{ 
-                textDecoration: 'none', 
-                color: '#133a5c', 
-                fontWeight: '500',
-                transition: 'color 0.2s'
-              }}
-              onMouseOver={(e) => e.currentTarget.style.color = '#e84c61'}
-              onMouseOut={(e) => e.currentTarget.style.color = '#133a5c'}
-            >
-              🔐 Đăng nhập
-            </Link>
-          )}
-        </nav>
-      </header>
-      
-      {/* Menu Categories */}
-      <div style={{
-        display: 'flex',
-        justifyContent: 'center',
-        gap: '36px',
-        padding: '12px 0',
-        fontSize: '15px',
-        fontWeight: '600',
-        color: '#133a5c',
-        background: '#eafcff',
-        borderTop: '1px solid #d0e8f0'
-      }}>
-        {menuItems.map(item => (
-          <div
-            key={item}
-            style={{ 
-              position: 'relative', 
-              display: 'inline-block',
-              paddingBottom: '12px'
-            }}
-            onMouseEnter={() => setActiveDropdown(item)}
-            onMouseLeave={() => setActiveDropdown(null)}
-          >
-            <Link 
-              to={menuRoutes[item]} 
-              style={{ 
-                cursor: 'pointer',
-                textDecoration: 'none',
-                color: 'inherit',
-                transition: 'color 0.2s'
-              }}
-              onMouseOver={(e) => e.currentTarget.style.color = '#e84c61'}
-              onMouseOut={(e) => e.currentTarget.style.color = '#133a5c'}
-            >
-              {item}
-            </Link>
-            
-            {activeDropdown === item && menuDropdowns[item] && (
+                  border: `1px solid ${colors.border}`,
+                  paddingLeft: '16px',
+                  paddingRight: '45px',
+                  outline: 'none',
+                  fontFamily: 'Montserrat, sans-serif',
+                  background: colors.inputBg,
+                  color: colors.paragraph,
+                  transition: 'all 0.2s'
+                }}
+              />
+              <button
+                type="submit"
+                style={{
+                  position: 'absolute',
+                  right: '8px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontSize: '18px',
+                  padding: '8px',
+                  color: colors.button,
+                  transition: 'color 0.2s'
+                }}
+                onMouseOver={(e) => e.currentTarget.style.color = colors.buttonHover}
+                onMouseOut={(e) => e.currentTarget.style.color = colors.button}
+              >
+                🔍
+              </button>
+            </form>
+
+            {/* Search Suggestions */}
+            {showSuggestions && (
               <div style={{
                 position: 'absolute',
                 top: '100%',
-                left: menuItems.indexOf(item) >= 3 ? 'auto' : 0,
-                right: menuItems.indexOf(item) >= 3 ? 0 : 'auto',
-                background: '#fff',
-                border: '1px solid #ddd',
+                left: 0,
+                right: 0,
+                marginTop: '8px',
+                background: colors.background,
                 borderRadius: '8px',
-                marginTop: '0px',
-                padding: '20px',
-                minWidth: '600px',
-                boxShadow: '0 4px 16px rgba(0,0,0,0.15)',
-                zIndex: 2000,
-                display: 'flex',
-                gap: '30px'
+                boxShadow: '0 8px 24px rgba(9, 64, 103, 0.12)',
+                maxHeight: '400px',
+                overflowY: 'auto',
+                zIndex: 1001,
+                border: `1px solid ${colors.borderLight}`
               }}>
-                {Object.entries(menuDropdowns[item]).map(([category, items]) => (
-                  <div key={category} style={{ flex: 1 }}>
-                    <div style={{
-                      fontWeight: 'bold',
-                      marginBottom: '12px',
-                      color: '#133a5c',
-                      fontSize: '14px'
-                    }}>
-                      {category}
-                    </div>
-                    {items.map(subItem => (
-                      <div
-                        key={subItem}
-                        style={{
-                          padding: '8px 0',
-                          cursor: 'pointer',
-                          color: '#2d4a67',
-                          fontSize: '13px',
-                          fontWeight: 'normal',
-                          transition: 'color 0.2s'
-                        }}
-                        onClick={() => handleSubItemClick(subItem)}
-                        onMouseOver={(e) => e.currentTarget.style.color = '#e84c61'}
-                        onMouseOut={(e) => e.currentTarget.style.color = '#2d4a67'}
-                      >
-                        {subItem}
+                {searchResults.length > 0 ? (
+                  searchResults.map((doc) => (
+                    <div
+                      key={doc._id}
+                      onClick={() => handleSuggestionClick(doc._id)}
+                      style={{
+                        padding: '14px 16px',
+                        borderBottom: `1px solid ${colors.borderLight}`,
+                        cursor: 'pointer',
+                        transition: 'background 0.2s',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '12px'
+                      }}
+                      onMouseOver={(e) => e.currentTarget.style.background = colors.inputBg}
+                      onMouseOut={(e) => e.currentTarget.style.background = colors.background}
+                    >
+                      <div style={{ flex: 1, textAlign: 'left' }}>
+                        <div style={{ 
+                          fontWeight: '600', 
+                          color: colors.headline, 
+                          fontSize: '14px', 
+                          marginBottom: '4px' 
+                        }}>
+                          {doc.title}
+                        </div>
+                        <div style={{ fontSize: '12px', color: colors.paragraph }}>
+                          {doc.category} • {doc.views || 0} lượt xem
+                        </div>
                       </div>
-                    ))}
+                    </div>
+                  ))
+                ) : (
+                  <div style={{
+                    padding: '32px 16px',
+                    textAlign: 'center',
+                    color: colors.paragraph,
+                    fontSize: '14px',
+                    fontWeight: '500'
+                  }}>
+                    Không tìm thấy tài liệu
                   </div>
-                ))}
+                )}
+              </div>
+            )}
+
+            {isSearching && (
+              <div style={{
+                position: 'absolute',
+                top: '100%',
+                left: 0,
+                marginTop: '8px',
+                background: colors.background,
+                borderRadius: '8px',
+                padding: '16px',
+                boxShadow: '0 8px 24px rgba(9, 64, 103, 0.12)',
+                color: colors.paragraph,
+                fontSize: '14px',
+                border: `1px solid ${colors.borderLight}`
+              }}>
+                Đang tìm kiếm...
               </div>
             )}
           </div>
-        ))}
+
+          {/* Navigation */}
+          <nav style={{ 
+            display: 'flex', 
+            gap: '24px',
+            fontSize: '14px', 
+            alignItems: 'center',
+            fontWeight: '600'
+          }}>
+            <Link 
+              to="/upload"
+              onClick={(e) => {
+                if (!isLoggedIn) {
+                  e.preventDefault();
+                  handleProtectedAction('Upload');
+                }
+              }}
+              style={{ 
+                textDecoration: 'none', 
+                color: colors.paragraph,
+                transition: 'color 0.2s',
+                whiteSpace: 'nowrap'
+              }}
+              onMouseOver={(e) => e.currentTarget.style.color = colors.button}
+              onMouseOut={(e) => e.currentTarget.style.color = colors.paragraph}
+            >
+              Upload
+            </Link>
+            
+            {isAdmin ? (
+            <Link
+              to="/admin"
+              style={{
+                padding: '8px 16px',
+                borderRadius: '6px',
+                background: colors.warning,
+                color: '#000',
+                fontWeight: '700',
+                fontSize: '13px',
+                textDecoration: 'none',
+                whiteSpace: 'nowrap',
+                transition: 'transform 0.2s'
+              }}
+              onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.05)'}
+              onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}
+            >
+              Quản lý
+            </Link>
+
+            ) : (
+              isLoggedIn && (
+                <div 
+                  onClick={() => navigate('/recharge')}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    padding: '8px 16px',
+                    background: colors.highlight,
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    whiteSpace: 'nowrap',
+                    color: colors.buttonText,
+                    fontWeight: '700'
+                  }}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.background = colors.buttonHover;
+                    e.currentTarget.style.transform = 'scale(1.05)';
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.background = colors.highlight;
+                    e.currentTarget.style.transform = 'scale(1)';
+                  }}
+                  title="Nhấn để nạp tiền"
+                >
+                  <span style={{ fontSize: '14px' }}>{userCoins} DP</span>
+                </div>
+              )
+            )}
+
+            <Link 
+              to="/saved"
+              onClick={(e) => {
+                if (!isLoggedIn) {
+                  e.preventDefault();
+                  handleProtectedAction('Saved');
+                }
+              }}
+              style={{ 
+                textDecoration: 'none', 
+                color: colors.paragraph,
+                transition: 'color 0.2s',
+                whiteSpace: 'nowrap'
+              }}
+              onMouseOver={(e) => e.currentTarget.style.color = colors.button}
+              onMouseOut={(e) => e.currentTarget.style.color = colors.paragraph}
+            >
+              Đã lưu
+            </Link>
+            
+            {isLoggedIn ? (
+              <div
+                style={{ position: 'relative', display: 'inline-block' }}
+                ref={userMenuRef}
+              >
+                <span
+                  style={{
+                    display: 'inline-block',
+                    width: 40,
+                    height: 40,
+                    borderRadius: '50%',
+                    background: (localStorage.getItem('avatarUrl') ?
+                      `url(${localStorage.getItem('avatarUrl')}) center/cover no-repeat`
+                      : colors.button
+                    ),
+                    color: colors.buttonText,
+                    fontWeight: '700',
+                    fontSize: '16px',
+                    textAlign: 'center',
+                    verticalAlign: 'middle',
+                    lineHeight: '40px',
+                    cursor: 'pointer',
+                    border: `2px solid ${colors.borderLight}`,
+                    boxShadow: '0 2px 8px rgba(9, 64, 103, 0.1)',
+                    transition: 'all 0.2s'
+                  }}
+                  onClick={() => setShowDropdown(prev => !prev)}
+                  onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.05)'}
+                  onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}
+                  title={username}
+                >
+                  {!localStorage.getItem('avatarUrl') && (username ? username[0].toUpperCase() : 'U')}
+                </span>
+                {showDropdown && (
+                  <div style={{
+                    position: 'absolute',
+                    top: '110%',
+                    right: 0,
+                    background: colors.background,
+                    border: `1px solid ${colors.borderLight}`,
+                    borderRadius: '8px',
+                    marginTop: '8px',
+                    minWidth: '180px',
+                    boxShadow: '0 8px 24px rgba(9, 64, 103, 0.12)',
+                    zIndex: 1000,
+                    overflow: 'hidden'
+                  }}>
+                    <div style={{ 
+                      padding: '12px 16px', 
+                      borderBottom: `1px solid ${colors.borderLight}`, 
+                      color: colors.headline, 
+                      fontWeight: '700',
+                      fontSize: '14px'
+                    }}>
+                      {username}
+                    </div>
+                    <Link to="/profile" style={{
+                      display: 'block',
+                      padding: '12px 16px',
+                      textDecoration: 'none',
+                      color: colors.paragraph,
+                      borderBottom: `1px solid ${colors.borderLight}`,
+                      transition: 'background 0.2s',
+                      fontSize: '14px',
+                      fontWeight: '500'
+                    }}
+                      onClick={() => setShowDropdown(false)}
+                      onMouseOver={e => e.currentTarget.style.background = colors.inputBg}
+                      onMouseOut={e => e.currentTarget.style.background = 'transparent'}
+                    >Hồ sơ</Link>
+                    <button
+                      onClick={handleLogout}
+                      style={{
+                        width: '100%',
+                        padding: '12px 16px',
+                        textAlign: 'left',
+                        background: 'none',
+                        border: 'none',
+                        cursor: 'pointer',
+                        color: colors.tertiary,
+                        fontSize: '14px',
+                        fontFamily: 'Montserrat, sans-serif',
+                        transition: 'background 0.2s',
+                        fontWeight: '500'
+                      }}
+                      onMouseOver={e => e.target.style.background = colors.inputBg}
+                      onMouseOut={e => e.target.style.background = 'transparent'}
+                    >Đăng xuất
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <Link 
+                to="/login" 
+                style={{ 
+                  textDecoration: 'none', 
+                  color: colors.paragraph,
+                  transition: 'color 0.2s',
+                  fontWeight: '600',
+                  whiteSpace: 'nowrap'
+                }}
+                onMouseOver={(e) => e.currentTarget.style.color = colors.button}
+                onMouseOut={(e) => e.currentTarget.style.color = colors.paragraph}
+              >
+                Đăng nhập
+              </Link>
+            )}
+          </nav>
+        </header>
+        
+        {/* Menu Categories */}
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          padding: '14px 0',
+          fontSize: '13px',
+          fontWeight: '600',
+          color: colors.headline,
+          borderTop: `1px solid ${colors.borderLight}`
+        }}>
+          {menuItems.map(item => (
+            <div
+              key={item}
+              style={{ 
+                position: 'relative',
+                display: 'inline-block'
+              }}
+              onMouseEnter={() => setActiveDropdown(item)}
+              onMouseLeave={() => setActiveDropdown(null)}
+            >
+              <Link 
+                to={menuRoutes[item]} 
+                style={{ 
+                  cursor: 'pointer',
+                  textDecoration: 'none',
+                  color: 'inherit',
+                  transition: 'color 0.2s',
+                  whiteSpace: 'nowrap'
+                }}
+                onMouseOver={(e) => e.currentTarget.style.color = colors.button}
+                onMouseOut={(e) => e.currentTarget.style.color = colors.headline}
+              >
+                {item}
+              </Link>
+              
+              {activeDropdown === item && menuDropdowns[item] && (
+                <div 
+                  onMouseEnter={() => setActiveDropdown(item)}
+                  onMouseLeave={() => setActiveDropdown(null)}
+                  style={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: menuItems.indexOf(item) >= 3 ? 'auto' : 0,
+                    right: menuItems.indexOf(item) >= 3 ? 0 : 'auto',
+                    paddingTop: '8px',
+                    marginTop: '0px',
+                  }}>
+                  <div style={{
+                    background: colors.background,
+                    border: `1px solid ${colors.borderLight}`,
+                    borderRadius: '8px',
+                    padding: '20px',
+                    minWidth: '600px',
+                    boxShadow: '0 8px 24px rgba(9, 64, 103, 0.12)',
+                    display: 'flex',
+                    gap: '30px'
+                  }}>
+                    {Object.entries(menuDropdowns[item]).map(([category, items]) => (
+                      <div key={category} style={{ flex: 1 }}>
+                        <div style={{
+                          fontWeight: '700',
+                          marginBottom: '12px',
+                          color: colors.headline,
+                          fontSize: '13px'
+                        }}>
+                          {category}
+                        </div>
+                        {items.map(subItem => (
+                          <div
+                            key={subItem}
+                            style={{
+                              padding: '8px 0',
+                              cursor: 'pointer',
+                              color: colors.paragraph,
+                              fontSize: '12px',
+                              fontWeight: '500',
+                              transition: 'color 0.2s'
+                            }}
+                            onClick={() => handleSubItemClick(subItem)}
+                            onMouseOver={(e) => e.currentTarget.style.color = colors.button}
+                            onMouseOut={(e) => e.currentTarget.style.color = colors.paragraph}
+                          >
+                            {subItem}
+                          </div>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
