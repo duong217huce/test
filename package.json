@@ -10,8 +10,14 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
+    "canvas": "^3.2.0",
     "dotenv": "^17.2.3",
+    "groq-sdk": "^0.35.0",
+    "mammoth": "^1.11.0",
     "mongoose": "^8.19.4",
+    "pdf-lib": "^1.17.1",
+    "pdf-poppler": "^0.2.3",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-router-dom": "^7.9.5"
