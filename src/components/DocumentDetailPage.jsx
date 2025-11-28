@@ -43,6 +43,7 @@ export default function DocumentDetailPage() {
   const [showReportCommentModal, setShowReportCommentModal] = useState(false);
   const [reportingCommentId, setReportingCommentId] = useState(null);
   const [showReportDocumentModal, setShowReportDocumentModal] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   useEffect(() => {
     const loggedIn = localStorage.getItem('isLoggedIn') === 'true';
@@ -329,6 +330,26 @@ export default function DocumentDetailPage() {
       alert('Có lỗi xảy ra khi báo cáo!');
     }
   };
+
+  const handleDeleteDocument = async () => {
+  try {
+    const token = localStorage.getItem('token');
+    const response = await fetch(`http://localhost:5000/api/documents/${id}`, {
+      method: 'DELETE',
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    if (response.ok) {
+      showToast('Xóa tài liệu thành công', 'success');
+      setTimeout(() => navigate('/'), 1000);
+    } else {
+      const data = await response.json();
+      alert(data.message || 'Có lỗi xảy ra!');
+    }
+  } catch (error) {
+    console.error('Error:', error);
+    alert('Có lỗi xảy ra!');
+  }
+};
 
   const fetchUserRating = useCallback(async () => {
     try {
@@ -748,24 +769,11 @@ export default function DocumentDetailPage() {
             }}>
               <h3 style={{ color: '#133a5c', marginBottom: '15px', textAlign: 'center' }}>
                 📖 Xem trước tài liệu
-                {canEdit && (
-                  <button
-                    style={{
-                      padding: '8px 18px',
-                      marginLeft: '15px',
-                      background: '#4ba3d6',
-                      color: '#fff',
-                      border: 'none',
-                      borderRadius: '6px',
-                      fontSize: '14px',
-                      fontWeight: 'bold',
-                      cursor: 'pointer'
-                    }}
-                    onClick={() => setShowEditPopup(true)}
-                  >
-                    ✏️ Chỉnh sửa
-                  </button>
-                )}
+                {canEdit && (<>
+                <button style={{padding:'8px 18px',marginLeft:'15px',background:'#4ba3d6',color:'#fff',border:'none',borderRadius:'6px',fontSize:'14px',fontWeight:'bold',cursor:'pointer'}} onClick={() => setShowEditPopup(true)}>Chỉnh sửa</button>
+                <button style={{padding:'8px 18px',marginLeft:'10px',background:'#fff',color:'#e84c61',border:'2px solid #e84c61',borderRadius:'6px',fontSize:'14px',fontWeight:'bold',cursor:'pointer'}} onClick={() => setShowDeleteConfirm(true)}>Xóa tài liệu</button>
+              </>)}
+
               </h3>
               {renderDocumentViewer()}
             </div>
@@ -894,7 +902,7 @@ export default function DocumentDetailPage() {
                             </button>
                           )}
 
-                          {isLoggedIn && comment.user?._id === currentUserId && (
+                          {isLoggedIn && (comment.user?._id === currentUserId || currentUserRole === 'admin') && (
                             <>
                               <button
                                 onClick={() => {
@@ -1517,6 +1525,29 @@ export default function DocumentDetailPage() {
           </div>
         </div>
       )}
+
+      {showDeleteConfirm && 
+      (<div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.5)',
+      display:'flex',alignItems:'center',justifyContent:'center',zIndex:9999}}>
+          <div style={{background:'#fff',padding:'30px',borderRadius:'12px',width:'400px',maxWidth:'90%',textAlign:'center'}}>
+          <h3 style={{color:'#e84c61',marginBottom:'20px'}}>⚠️ Xác nhận xóa</h3><p style={{color:'#2d4a67',marginBottom:'25px'}}
+              >Bạn có chắc muốn xóa tài liệu này?<br/>
+              <strong>Hành động này không thể hoàn tác!</strong>
+          </p><div style={{display:'flex',gap:'10px',justifyContent:'center'}}>
+            <button onClick={handleDeleteDocument} 
+          tyle={{padding:'12px 24px',
+                  background:'#e84c61',color:'#fff',border:'none',borderRadius:'6px',fontSize:'14px',fontWeight:'bold',cursor:'pointer'}}
+                  >Xóa
+                  </button>
+                  <button onClick={()=>setShowDeleteConfirm(false)} 
+                  style={{padding:'12px 24px',background:'#f5f5f5',color:'#333',
+                  border:'1px solid #ddd',borderRadius:'6px',fontSize:'14px',fontWeight:'bold',cursor:'pointer'}}
+                  >Hủy</button>
+                  </div>
+                  </div>
+                  </div>)}
+
+
     </div>
   );
 }
