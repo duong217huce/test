@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const Document = require('../models/Document');
 const User = require('../models/User');
+const Report = require('../models/Report');
 const auth = require('../middleware/auth');
 const { isAdmin } = require('../middleware/auth');
 
@@ -156,6 +157,60 @@ router.put('/users/:userId/coins', async (req, res) => {
     res.json({ message: 'Coins updated successfully', user });
   } catch (error) {
     console.error('❌ Error updating coins:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// ⭐ NEW: GET /api/admin/reports - Lấy danh sách báo cáo
+router.get('/reports', async (req, res) => {
+  try {
+    const reports = await Report.find()
+      .populate('reportedBy', 'username email')
+      .sort({ createdAt: -1 })
+      .limit(50);
+    
+    console.log(`✅ Fetched ${reports.length} reports`);
+    res.json(reports);
+  } catch (error) {
+    console.error('❌ Error fetching reports:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// ⭐ NEW: PUT /api/admin/reports/:id/mark-read - Đánh dấu đã đọc
+router.put('/reports/:id/mark-read', async (req, res) => {
+  try {
+    const report = await Report.findByIdAndUpdate(
+      req.params.id,
+      { isRead: true },
+      { new: true }
+    );
+    
+    if (!report) {
+      return res.status(404).json({ message: 'Report not found' });
+    }
+    
+    console.log(`✅ Marked report ${req.params.id} as read`);
+    res.json({ message: 'Report marked as read', report });
+  } catch (error) {
+    console.error('❌ Error marking report as read:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// ⭐ NEW: DELETE /api/admin/reports/:id - Xóa báo cáo
+router.delete('/reports/:id', async (req, res) => {
+  try {
+    const report = await Report.findByIdAndDelete(req.params.id);
+    
+    if (!report) {
+      return res.status(404).json({ message: 'Report not found' });
+    }
+    
+    console.log(`✅ Deleted report ${req.params.id}`);
+    res.json({ message: 'Report deleted successfully' });
+  } catch (error) {
+    console.error('❌ Error deleting report:', error);
     res.status(500).json({ message: error.message });
   }
 });
