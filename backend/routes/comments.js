@@ -116,8 +116,7 @@ router.put('/:id', auth, async (req, res) => {
 
 // @route   DELETE /api/comments/:id
 // @desc    Delete a comment
-// @access  Private (only owner)
-router.delete('/:id', auth, async (req, res) => {
+// @access  Private (owner or admin)router.delete('/:id', auth, async (req, res) => {
   try {
     const comment = await Comment.findById(req.params.id);
 
@@ -125,7 +124,7 @@ router.delete('/:id', auth, async (req, res) => {
       return res.status(404).json({ message: 'Comment not found' });
     }
 
-    if (comment.user.toString() !== req.user.id) {
+        if (comment.user.toString() !== req.user.id && req.user.role !== 'admin') {
       return res.status(403).json({ message: 'Not authorized' });
     }
 
@@ -175,3 +174,4 @@ router.post('/:id/like', auth, async (req, res) => {
 });
 
 module.exports = router;
+
