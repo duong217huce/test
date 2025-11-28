@@ -11,6 +11,8 @@ const documentRoutes = require('./routes/documents');
 const commentRoutes = require('./routes/comments');
 const ratingRoutes = require('./routes/ratings');
 const userRoutes = require('./routes/users');
+const quizRoutes = require('./routes/quizzes');
+const adminRoutes = require('./routes/admin');
 
 const app = express();
 
@@ -21,20 +23,26 @@ app.use(cors({
 }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+// ❌ XÓA DÒNG NÀY: app.use('/api/admin', adminRoutes);
 
 // ==================== FILE SYSTEM SETUP ====================
 const uploadsDir = path.join(__dirname, 'uploads');
-const coversDir = path.join(__dirname, 'uploads/covers'); // ✅ THÊM
+const coversDir = path.join(__dirname, 'uploads/covers');
+const quizCoversDir = path.join(__dirname, 'uploads/quiz-covers');
 
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
   console.log('📁 Đã tạo thư mục uploads');
 }
 
-// ✅ THÊM: Tạo thư mục covers
 if (!fs.existsSync(coversDir)) {
   fs.mkdirSync(coversDir, { recursive: true });
   console.log('🖼️ Đã tạo thư mục uploads/covers');
+}
+
+if (!fs.existsSync(quizCoversDir)) {
+  fs.mkdirSync(quizCoversDir, { recursive: true });
+  console.log('🖼️ Đã tạo thư mục uploads/quiz-covers');
 }
 
 // ==================== STATIC FILES & DOWNLOADS ====================
@@ -48,7 +56,16 @@ app.use('/uploads', (req, res, next) => {
   next();
 }, express.static(uploadsDir));
 
-// ✅ THÊM: Serve cover images
+// Serve quiz covers
+app.use('/uploads/quiz-covers', (req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.header('Cross-Origin-Resource-Policy', 'cross-origin');
+  next();
+}, express.static(quizCoversDir));
+
+// Serve cover images
 app.use('/uploads/covers', (req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Methods', 'GET');
@@ -91,6 +108,8 @@ app.use('/api/documents', documentRoutes);
 app.use('/api/comments', commentRoutes);
 app.use('/api/ratings', ratingRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/quizzes', quizRoutes);
+app.use('/api/admin', adminRoutes); // ✅ DI CHUYỂN VÀO ĐÂY
 
 // ==================== UTILITY ENDPOINTS ====================
 
@@ -106,24 +125,32 @@ app.get('/test-uploads', (req, res) => {
     
     const files = fs.readdirSync(uploadsDir);
     const covers = fs.existsSync(coversDir) ? fs.readdirSync(coversDir) : [];
+    const quizCovers = fs.existsSync(quizCoversDir) ? fs.readdirSync(quizCoversDir) : [];
     const PORT = process.env.PORT || 5000;
     
     res.json({ 
       message: 'Uploads folder exists',
       path: uploadsDir,
-      coversPath: coversDir, // ✅ THÊM
+      coversPath: coversDir,
+      quizCoversPath: quizCoversDir,
       totalFiles: files.length,
-      totalCovers: covers.length, // ✅ THÊM
+      totalCovers: covers.length,
+      totalQuizCovers: quizCovers.length,
       files: files.map(file => ({
         name: file,
         previewUrl: `http://localhost:${PORT}/uploads/${file}`,
         downloadUrl: `http://localhost:${PORT}/download/${file}`,
         size: fs.statSync(path.join(uploadsDir, file)).size
       })),
-      covers: covers.map(cover => ({ // ✅ THÊM
+      covers: covers.map(cover => ({
         name: cover,
         url: `http://localhost:${PORT}/uploads/covers/${cover}`,
         size: fs.statSync(path.join(coversDir, cover)).size
+      })),
+      quizCovers: quizCovers.map(cover => ({
+        name: cover,
+        url: `http://localhost:${PORT}/uploads/quiz-covers/${cover}`,
+        size: fs.statSync(path.join(quizCoversDir, cover)).size
       }))
     });
   } catch (error) {
@@ -143,8 +170,11 @@ app.get('/', (req, res) => {
       comments: '/api/comments',
       ratings: '/api/ratings',
       users: '/api/users',
+      quizzes: '/api/quizzes',
+      admin: '/api/admin',
       uploads: '/uploads',
-      covers: '/uploads/covers', // ✅ THÊM
+      covers: '/uploads/covers',
+      quizCovers: '/uploads/quiz-covers',
       download: '/download/:filename'
     },
     timestamp: new Date().toISOString()
@@ -154,6 +184,7 @@ app.get('/', (req, res) => {
 // ==================== ERROR HANDLING ====================
 
 // Global error handler
+// eslint-disable-next-line no-unused-vars
 app.use((err, req, res, next) => {
   console.error('❌ Server Error:', err.stack);
   res.status(500).json({ 
@@ -180,9 +211,11 @@ const server = app.listen(PORT, () => {
   console.log(`📡 Server đang chạy trên port ${PORT}`);
   console.log(`🌐 API URL: http://localhost:${PORT}`);
   console.log(`📂 Uploads folder: ${uploadsDir}`);
-  console.log(`🖼️ Covers folder: ${coversDir}`); // ✅ THÊM
+  console.log(`🖼️ Covers folder: ${coversDir}`);
+  console.log(`🖼️ Quiz covers folder: ${quizCoversDir}`);
   console.log(`📁 Preview URL: http://localhost:${PORT}/uploads`);
-  console.log(`🖼️ Covers URL: http://localhost:${PORT}/uploads/covers`); // ✅ THÊM
+  console.log(`🖼️ Covers URL: http://localhost:${PORT}/uploads/covers`);
+  console.log(`🖼️ Quiz Covers URL: http://localhost:${PORT}/uploads/quiz-covers`);
   console.log(`📥 Download URL: http://localhost:${PORT}/download`);
   console.log(`🔍 Test uploads: http://localhost:${PORT}/test-uploads`);
   console.log('='.repeat(60));
@@ -197,12 +230,12 @@ const server = app.listen(PORT, () => {
   console.log('   - GET    /api/documents/search');
   console.log('   - GET    /api/documents/:id');
   console.log('   - GET    /api/documents/:id/preview');
-  console.log('   - POST   /api/documents (✅ with cover image)');
+  console.log('   - POST   /api/documents (with cover image)');
   console.log('   - PUT    /api/documents/:id');
   console.log('   - DELETE /api/documents/:id');
   console.log('   - POST   /api/documents/:id/download');
-  console.log('   - POST   /api/documents/:id/purchase (✅ NEW)');
-  console.log('   - GET    /api/documents/:id/check-purchase (✅ NEW)');
+  console.log('   - POST   /api/documents/:id/purchase');
+  console.log('   - GET    /api/documents/:id/check-purchase');
   console.log('');
   console.log('💬 Comments:');
   console.log('   - GET    /api/comments/:documentId');
@@ -222,9 +255,25 @@ const server = app.listen(PORT, () => {
   console.log('   - GET    /api/users/saved/check/:documentId');
   console.log('   - POST   /api/users/saved/:documentId');
   console.log('');
+  console.log('📝 Quizzes:');
+  console.log('   - GET    /api/quizzes');
+  console.log('   - GET    /api/quizzes/:id');
+  console.log('   - POST   /api/quizzes (with coverImage)');
+  console.log('   - PUT    /api/quizzes/:id');
+  console.log('   - DELETE /api/quizzes/:id');
+  console.log('   - POST   /api/quizzes/:id/start');
+  console.log('   - POST   /api/quizzes/:id/submit');
+  console.log('');
+  console.log('👑 Admin:'); // ✅ THÊM
+  console.log('   - GET    /api/admin/statistics');
+  console.log('   - GET    /api/admin/users');
+  console.log('   - GET    /api/admin/users/:userId/documents');
+  console.log('   - PUT    /api/admin/users/:userId/coins');
+  console.log('');
   console.log('📁 Files:');
   console.log('   - GET    /uploads/:filename (preview)');
-  console.log('   - GET    /uploads/covers/:filename (cover images)'); // ✅ THÊM
+  console.log('   - GET    /uploads/covers/:filename (cover images)');
+  console.log('   - GET    /uploads/quiz-covers/:filename (quiz covers)');
   console.log('   - GET    /download/:filename (download)');
   console.log('='.repeat(60));
 });

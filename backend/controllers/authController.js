@@ -18,7 +18,8 @@ exports.register = async (req, res) => {
       email,
       password: hashedPassword,
       fullName,
-      coins: 0
+      coins: 0,
+      role: 'user' // ✅ Mặc định là user
     });
     
     await user.save();
@@ -49,15 +50,15 @@ exports.login = async (req, res) => {
       { 
         id: user._id,
         username: user.username,
-        role: user.role 
+        role: user.role || 'user' // ✅ Đảm bảo luôn có role
       },
       process.env.JWT_SECRET,
       { expiresIn: '7d' }
     );
     
-    console.log('✅ User logged in:', username);
+    console.log('✅ User logged in:', username, '| Role:', user.role || 'user');
     
-    // ✅ TRẢ VỀ ĐẦY ĐỦ THÔNG TIN
+    // ✅ TRẢ VỀ ĐẦY ĐỦ THÔNG TIN BAO GỒM ROLE
     res.json({
       token,
       user: {
@@ -71,7 +72,7 @@ exports.login = async (req, res) => {
         lop: user.lop || '',
         chuyenNganh: user.chuyenNganh || '',
         bio: user.bio || '',
-        role: user.role,
+        role: user.role || 'user', // ✅ Thêm role vào response
         coins: user.coins || 0,
         createdAt: user.createdAt
       }
