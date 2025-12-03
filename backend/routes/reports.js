@@ -8,11 +8,11 @@ router.post('/document', auth, async (req, res) => {
   try {
     const { documentId, documentTitle, reasons } = req.body;
 
-    // Check if user already reported this document
+    // ✅ ĐỔI: req.user.userId → req.user.id
     const existingReport = await Report.findOne({
       type: 'document',
       documentId,
-      reportedBy: req.user.userId
+      reportedBy: req.user.id
     });
 
     if (existingReport) {
@@ -21,7 +21,7 @@ router.post('/document', auth, async (req, res) => {
 
     const report = new Report({
       type: 'document',
-      reportedBy: req.user.userId,
+      reportedBy: req.user.id,  // ✅ ĐỔI TẠI ĐÂY
       documentId,
       documentTitle,
       reasons
@@ -40,11 +40,11 @@ router.post('/comment', auth, async (req, res) => {
   try {
     const { commentId, commentContent, documentId, documentTitle, reasons } = req.body;
 
-    // Check if user already reported this comment
+    // ✅ ĐỔI: req.user.userId → req.user.id
     const existingReport = await Report.findOne({
       type: 'comment',
       commentId,
-      reportedBy: req.user.userId
+      reportedBy: req.user.id
     });
 
     if (existingReport) {
@@ -53,7 +53,7 @@ router.post('/comment', auth, async (req, res) => {
 
     const report = new Report({
       type: 'comment',
-      reportedBy: req.user.userId,
+      reportedBy: req.user.id,  // ✅ ĐỔI TẠI ĐÂY
       documentId,
       documentTitle,
       commentId,

@@ -19,6 +19,16 @@ const transactionSchema = new mongoose.Schema({
     type: Number,
     required: true
   },
+  orderId: {
+    type: String,
+    unique: true,
+    sparse: true
+  },
+  status: {
+    type: String,
+    enum: ['pending', 'completed', 'failed'],
+    default: 'pending'
+  },
   createdAt: {
     type: Date,
     default: Date.now

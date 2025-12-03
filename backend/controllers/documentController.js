@@ -69,7 +69,7 @@ exports.uploadDocument = async (req, res) => {
     
     // Thưởng điểm cho người upload
     await User.findByIdAndUpdate(req.userId, {
-      $inc: { documentPoints: 10 }
+      $inc: { coins: 10 }
     });
     
     // Tạo transaction
@@ -99,12 +99,12 @@ exports.downloadDocument = async (req, res) => {
     if (document.isPaid) {
       const user = await User.findById(req.userId);
       
-      if (user.documentPoints < document.price) {
+      if (user.coins < document.price) {
         return res.status(400).json({ message: 'Không đủ DP để tải tài liệu' });
       }
       
       // Trừ điểm
-      user.documentPoints -= document.price;
+      user.coins -= document.price;
       await user.save();
       
       // Tạo transaction

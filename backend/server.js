@@ -14,6 +14,7 @@ const userRoutes = require('./routes/users');
 const quizRoutes = require('./routes/quizzes');
 const adminRoutes = require('./routes/admin');
 const reportRoutes = require('./routes/reports');
+const paymentRoutes = require('./routes/payment');
 
 const app = express();
 
@@ -29,6 +30,7 @@ app.use(express.urlencoded({ extended: true }));
 const uploadsDir = path.join(__dirname, 'uploads');
 const coversDir = path.join(__dirname, 'uploads/covers');
 const quizCoversDir = path.join(__dirname, 'uploads/quiz-covers');
+const avatarsDir = path.join(__dirname, 'uploads/avatars');
 
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
@@ -43,6 +45,11 @@ if (!fs.existsSync(coversDir)) {
 if (!fs.existsSync(quizCoversDir)) {
   fs.mkdirSync(quizCoversDir, { recursive: true });
   console.log('🖼️ Đã tạo thư mục uploads/quiz-covers');
+}
+
+if (!fs.existsSync(avatarsDir)) {
+  fs.mkdirSync(avatarsDir, { recursive: true });
+  console.log('👤 Đã tạo thư mục uploads/avatars');
 }
 
 // ==================== STATIC FILES & DOWNLOADS ====================
@@ -73,6 +80,15 @@ app.use('/uploads/covers', (req, res, next) => {
   res.header('Cross-Origin-Resource-Policy', 'cross-origin');
   next();
 }, express.static(coversDir));
+
+// ✅ Serve avatar images
+app.use('/uploads/avatars', (req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.header('Cross-Origin-Resource-Policy', 'cross-origin');
+  next();
+}, express.static(avatarsDir));
 
 // Download files (force download)
 app.get('/download/:filename', (req, res) => {
@@ -111,6 +127,7 @@ app.use('/api/users', userRoutes);
 app.use('/api/quizzes', quizRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/reports', reportRoutes);
+app.use('/api/payment', paymentRoutes);
 
 // ==================== UTILITY ENDPOINTS ====================
 

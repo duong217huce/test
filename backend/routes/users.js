@@ -43,26 +43,26 @@ router.post('/avatar', auth, avatarUpload.single('avatar'), async (req, res) => 
       return res.status(400).json({ message: 'Vui lòng chọn file ảnh' });
     }
 
-    const avatarUrl = `/uploads/avatars/${req.file.filename}`;
+    const newAvatarUrl = `/uploads/avatars/${req.file.filename}`;
     
     // Xóa avatar cũ nếu có
     const user = await User.findById(req.user.id);
-    if (user.avatar && user.avatar.startsWith('/uploads/avatars/')) {
-      const oldAvatarPath = path.join(__dirname, '..', user.avatar);
+    if (user.avatarUrl && user.avatarUrl.startsWith('/uploads/avatars/')) {
+      const oldAvatarPath = path.join(__dirname, '..', user.avatarUrl);
       if (fs.existsSync(oldAvatarPath)) {
         fs.unlinkSync(oldAvatarPath);
         console.log('🗑️ Deleted old avatar');
       }
     }
 
-    // Cập nhật avatar mới
-    user.avatar = avatarUrl;
+    // ✅ Cập nhật avatar mới - sử dụng đúng field name 'avatarUrl'
+    user.avatarUrl = newAvatarUrl;
     await user.save();
 
-    console.log('✅ Avatar uploaded:', avatarUrl);
+    console.log('✅ Avatar uploaded:', newAvatarUrl);
     res.json({ 
       message: 'Upload ảnh đại diện thành công',
-      avatarUrl: avatarUrl
+      avatarUrl: newAvatarUrl
     });
   } catch (error) {
     console.error('❌ Error uploading avatar:', error);

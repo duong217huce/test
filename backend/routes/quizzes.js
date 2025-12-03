@@ -102,7 +102,7 @@ router.get('/:id', async (req, res) => {
 // @access  Private
 router.post('/', auth, upload.single('coverImage'), async (req, res) => {
   try {
-    const { title, description, grade, subject, duration, password, sections } = req.body;
+    const { title, description, grade, subject, duration, password, sections, isPublished } = req.body;
     
     let coverImageUrl = null;
     if (req.file) {
@@ -110,6 +110,19 @@ router.post('/', auth, upload.single('coverImage'), async (req, res) => {
     }
     
     const parsedSections = typeof sections === 'string' ? JSON.parse(sections) : sections;
+    
+    // Xử lý isPublished: FormData gửi string, cần convert sang boolean
+    // Nếu không có thì mặc định là true (publish ngay)
+    let published = true;
+    if (isPublished !== undefined) {
+      if (typeof isPublished === 'string') {
+        published = isPublished === 'true' || isPublished === '1';
+      } else {
+        published = Boolean(isPublished);
+      }
+    }
+    
+    console.log('📝 Creating quiz with isPublished:', published, '(from:', isPublished, ')');
     
     const newQuiz = new Quiz({
       title,
@@ -120,7 +133,8 @@ router.post('/', auth, upload.single('coverImage'), async (req, res) => {
       duration: parseInt(duration),
       password,
       sections: parsedSections || [],
-      createdBy: req.user.id
+      createdBy: req.user.id,
+      isPublished: published
     });
     
     const savedQuiz = await newQuiz.save();

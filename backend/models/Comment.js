@@ -1,21 +1,19 @@
 const mongoose = require('mongoose');
 
 const commentSchema = new mongoose.Schema({
+  user: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true
+  },
   document: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Document',
     required: true
   },
-  user: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: false
-  },
   content: {
     type: String,
-    required: true,
-    trim: true,
-    maxlength: 1000
+    required: true
   },
   parentComment: {
     type: mongoose.Schema.Types.ObjectId,
@@ -34,9 +32,16 @@ const commentSchema = new mongoose.Schema({
     type: Date,
     default: Date.now
   }
+}, {
+  toJSON: { virtuals: true },
+  toObject: { virtuals: true }
 });
 
-commentSchema.index({ document: 1, createdAt: -1 });
-commentSchema.index({ parentComment: 1 });
+// Virtual field for replies - TỰ ĐỘNG TÌM CÁC COMMENT CON
+commentSchema.virtual('replies', {
+  ref: 'Comment',
+  localField: '_id',
+  foreignField: 'parentComment'
+});
 
 module.exports = mongoose.model('Comment', commentSchema);

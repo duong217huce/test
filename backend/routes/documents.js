@@ -4,6 +4,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const mammoth = require('mammoth');
+const pdfParse = require('pdf-parse');
 const { promisify } = require('util');
 const { exec } = require('child_process');
 const execPromise = promisify(exec);
@@ -131,13 +132,126 @@ router.get('/search', async (req, res) => {
   }
 });
 
+// @route   GET /api/documents/:id/view
+// @desc    Serve PDF file for viewing in iframe
+// @access  Public
+router.get('/:id/view', async (req, res) => {
+  try {
+    const document = await Document.findById(req.params.id);
+    
+    if (!document) {
+      return res.status(404).json({ message: 'Document not found' });
+    }
+
+    const fileType = document.fileType || '';
+    if (!fileType.includes('pdf') && !document.fileUrl.endsWith('.pdf')) {
+      return res.status(400).json({ message: 'Only PDF files supported for view endpoint' });
+    }
+
+    const filename = path.basename(document.fileUrl);
+    const filePath = path.join(uploadsDir, filename);
+
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ message: 'File not found' });
+    }
+
+    // Set proper headers for PDF viewing
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="${document.title}.pdf"`);
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+
+    // Stream the PDF file
+    const fileStream = fs.createReadStream(filePath);
+    fileStream.pipe(res);
+  } catch (error) {
+    console.error('❌ Error serving PDF:', error);
+    res.status(500).json({ message: 'Lỗi server', error: error.message });
+  }
+});
+
+// @route   GET /api/documents/:id/extract-text
+// @desc    Trích xuất text từ tài liệu (PDF, DOCX, TXT)
+// @access  Public
+router.get('/:id/extract-text', async (req, res) => {
+  try {
+    const document = await Document.findById(req.params.id);
+    
+    if (!document) {
+      return res.status(404).json({ message: 'Document not found' });
+    }
+
+    const filename = path.basename(document.fileUrl);
+    const filePath = path.join(uploadsDir, filename);
+
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ message: 'File not found' });
+    }
+
+    const fileType = document.fileType || '';
+    let extractedText = '';
+
+    console.log('📄 Extracting text from:', filename, 'Type:', fileType);
+
+    // Xử lý PDF
+    if (fileType.includes('pdf')) {
+      try {
+        const dataBuffer = fs.readFileSync(filePath);
+        const data = await pdfParse(dataBuffer);
+        extractedText = data.text;
+        console.log('✅ PDF text extracted, length:', extractedText.length);
+      } catch (error) {
+        console.error('❌ Error parsing PDF:', error);
+        return res.status(500).json({ message: 'Lỗi khi đọc file PDF', error: error.message });
+      }
+    }
+    // Xử lý Word (DOCX)
+    else if (fileType.includes('word') || fileType.includes('document') || filename.toLowerCase().endsWith('.docx')) {
+      try {
+        const result = await mammoth.extractRawText({ path: filePath });
+        extractedText = result.value;
+        console.log('✅ DOCX text extracted, length:', extractedText.length);
+      } catch (error) {
+        console.error('❌ Error parsing DOCX:', error);
+        return res.status(500).json({ message: 'Lỗi khi đọc file Word', error: error.message });
+      }
+    }
+    // Xử lý TXT
+    else if (fileType.includes('text') || filename.toLowerCase().endsWith('.txt')) {
+      try {
+        extractedText = fs.readFileSync(filePath, 'utf-8');
+        console.log('✅ TXT text extracted, length:', extractedText.length);
+      } catch (error) {
+        console.error('❌ Error reading TXT:', error);
+        return res.status(500).json({ message: 'Lỗi khi đọc file TXT', error: error.message });
+      }
+    }
+    else {
+      return res.status(400).json({ message: 'Loại file không được hỗ trợ. Chỉ hỗ trợ PDF, DOCX, TXT' });
+    }
+
+    // Giới hạn độ dài text để tránh quá dài (giữ lại khoảng 10000 ký tự đầu)
+    if (extractedText.length > 10000) {
+      extractedText = extractedText.substring(0, 10000) + '\n\n[... Nội dung đã được rút gọn ...]';
+    }
+
+    res.json({ 
+      success: true,
+      text: extractedText,
+      length: extractedText.length
+    });
+  } catch (error) {
+    console.error('❌ Error extracting text:', error);
+    res.status(500).json({ message: 'Lỗi server', error: error.message });
+  }
+});
+
 // @route   GET /api/documents/:id
 // @desc    Get single document by ID
 // @access  Public
 router.get('/:id', async (req, res) => {
   try {
     const document = await Document.findById(req.params.id)
-      .populate('uploadedBy', 'username fullName');
+      .populate('uploadedBy', '_id id username fullName'); // ← THÊM '_id id'
     
     if (!document) {
       return res.status(404).json({ message: 'Document not found' });
@@ -274,7 +388,7 @@ router.post('/', auth, upload.fields([
     const documentFile = req.files.file[0];
     const coverImageFile = req.files.coverImage ? req.files.coverImage[0] : null;
 
-    const { title, description, category, tags } = req.body;
+    const { title, description, category, tags, coverImageUrl: sampleCoverUrl } = req.body;
     const fileUrl = `${req.protocol}://${req.get('host')}/uploads/${documentFile.filename}`;
     
     if (!req.user || !req.user.id) {
@@ -294,15 +408,19 @@ router.post('/', auth, upload.fields([
       }
     }
 
-    // ✅ XỬ LÝ ẢNH BÌA
+    // ✅ XỬ LÝ ẢNH BÌA (ưu tiên: file upload > URL mẫu > tự động từ PDF)
     let coverImageUrl = null;
 
     if (coverImageFile) {
-      // User đã upload ảnh bìa
+      // 1. User đã upload ảnh bìa từ file
       coverImageUrl = `${req.protocol}://${req.get('host')}/uploads/covers/${coverImageFile.filename}`;
       console.log('🖼️ User uploaded cover:', coverImageFile.filename);
+    } else if (sampleCoverUrl) {
+      // 2. User chọn ảnh bìa mẫu (URL)
+      coverImageUrl = sampleCoverUrl;
+      console.log('🖼️ User selected sample cover:', sampleCoverUrl);
     } else if (documentFile.mimetype === 'application/pdf') {
-      // ✅ TỰ ĐỘNG TẠO ẢNH BÌA TỪ PDF
+      // 3. Tự động tạo ảnh bìa từ trang đầu PDF
       try {
         const pdfPath = documentFile.path;
         const outputFilename = `cover-${Date.now()}.jpg`;
@@ -317,9 +435,11 @@ router.post('/', auth, upload.fields([
         console.log('✅ Auto-generated cover:', outputFilename);
       } catch (error) {
         console.error('⚠️ PDF cover generation failed:', error.message);
+        // Nếu không thể tạo từ PDF, sử dụng ảnh mặc định
+        console.log('📄 Using default placeholder');
       }
     } else {
-      console.log('📄 Non-PDF file without cover');
+      console.log('📄 Non-PDF file without cover - no cover image');
     }
 
     // ✅ TỰ ĐỘNG XÁC ĐỊNH TÀI LIỆU TRẢ PHÍ (>= 4MB)
