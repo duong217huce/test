@@ -1,19 +1,44 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import Header from './Header';
-import { refreshUserData } from '../utils/userUtils';
+import Footer from './Footer';
 
-const cardStyle = {
-  background: '#b4cbe0',
-  width: '100%',
-  height: '140px',
-  borderRadius: '7px 7px 0 0',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  color: '#fff',
-  fontSize: '14px'
-};
+// ✅ Component hiển thị ảnh bìa tài liệu
+function DocumentCover({ coverImage, title }) {
+  const [imageError, setImageError] = React.useState(false);
+  
+  const containerStyle = {
+    background: '#b4cbe0',
+    width: '100%',
+    height: '140px',
+    borderRadius: '7px 7px 0 0',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    color: '#fff',
+    fontSize: '48px',
+    overflow: 'hidden'
+  };
+
+  if (coverImage && !imageError) {
+    return (
+      <div style={containerStyle}>
+        <img 
+          src={coverImage}
+          alt={title}
+          onError={() => setImageError(true)}
+          style={{
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover'
+          }}
+        />
+      </div>
+    );
+  }
+  
+  return <div style={containerStyle}>📄</div>;
+}
 const hocCapList = ['', 'Tiểu học', 'THCS', 'THPT', 'Đại học', 'Sau đại học'];
 
 export default function ProfilePage() {
@@ -48,6 +73,15 @@ export default function ProfilePage() {
       return;
     }
     const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+    
+    // ✅ Xử lý avatar URL - ưu tiên từ localStorage riêng, sau đó từ user object
+    let avatarDisplay = localStorage.getItem('avatarUrl') || '';
+    if (!avatarDisplay && storedUser.avatarUrl) {
+      avatarDisplay = storedUser.avatarUrl.startsWith('http') 
+        ? storedUser.avatarUrl 
+        : `http://localhost:5000${storedUser.avatarUrl}`;
+    }
+    
     setUserData({
       username: storedUser.username || '',
       fullName: storedUser.fullName || '',
@@ -58,7 +92,7 @@ export default function ProfilePage() {
       totalDownloads: 0,
       totalViews: 0,
       bio: storedUser.bio || '',
-      avatar: localStorage.getItem('avatarUrl') || '',
+      avatar: avatarDisplay,
       hocCap: storedUser.hocCap || '',
       lop: storedUser.lop || '',
       chuyenNganh: storedUser.chuyenNganh || ''
@@ -98,104 +132,115 @@ export default function ProfilePage() {
   };
 
   const handleAvatarChange = async (e) => {
-  const file = e.target.files[0];
-  if (!file) return;
+    const file = e.target.files[0];
+    if (!file) return;
 
-  try {
-    const formData = new FormData();
-    formData.append('avatar', file);
-
-    const token = localStorage.getItem('token');
-    const response = await fetch('http://localhost:5000/api/users/avatar', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`
-      },
-      body: formData
-    });
-
-    if (!response.ok) {
-      throw new Error('Upload failed');
-    }
-
-    const data = await response.json();
-    const fullAvatarUrl = `http://localhost:5000${data.avatarUrl}`;
-    
-    console.log('✅ Avatar uploaded:', fullAvatarUrl);
-    
-    // Cập nhật state
-    setUserData(prev => ({ ...prev, avatar: fullAvatarUrl }));
-    
-    // Cập nhật localStorage
-    const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
-    currentUser.avatar = data.avatarUrl;
-    localStorage.setItem('user', JSON.stringify(currentUser));
-    
-    alert('Đã cập nhật ảnh đại diện!');
-  } catch (error) {
-    console.error('❌ Error uploading avatar:', error);
-    alert('Có lỗi khi upload ảnh đại diện!');
-  }
-  };
-
-  const handleEdit = async () => {
-  if (isEditing) {
-    if (isSaving) {
-      console.log('⚠️ Đang lưu...');
-      return;
-    }
-    setIsSaving(true);
     try {
-      const token = localStorage.getItem('token');
-      const dataToSend = {
-        fullName: userData.fullName,
-        hocCap: userData.hocCap,
-        lop: userData.lop,
-        chuyenNganh: userData.chuyenNganh,
-        phone: userData.phone,
-        bio: userData.bio
-      };
+      const formData = new FormData();
+      formData.append('avatar', file);
 
-      const response = await fetch('http://localhost:5000/api/users/me', {
-        method: 'PUT',
+      const token = localStorage.getItem('token');
+      const response = await fetch('http://localhost:5000/api/users/avatar', {
+        method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify(dataToSend)
+        body: formData
       });
 
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Failed to update');
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Upload failed');
       }
 
-      // ✅ SỬ DỤNG HELPER
-      await refreshUserData();
+      const data = await response.json();
+      const fullAvatarUrl = `http://localhost:5000${data.avatarUrl}`;
       
-      // ✅ Fetch lại để cập nhật UI
-      const updatedUser = await response.json();
-      setUserData(prev => ({
-        ...prev,
-        fullName: updatedUser.fullName,
-        hocCap: updatedUser.hocCap,
-        lop: updatedUser.lop,
-        chuyenNganh: updatedUser.chuyenNganh,
-        phone: updatedUser.phone,
-        bio: updatedUser.bio
-      }));
+      console.log('✅ Avatar uploaded:', fullAvatarUrl);
       
-      alert('✅ Đã lưu thông tin hồ sơ!');
-      setIsEditing(false);
-    } catch (err) {
-      console.error('❌ Error updating profile:', err);
-      alert('Có lỗi khi lưu thông tin: ' + err.message);
-    } finally {
-      setIsSaving(false);
+      // ✅ Cập nhật state
+      setUserData(prev => ({ ...prev, avatar: fullAvatarUrl }));
+      
+      // ✅ Cập nhật localStorage - sử dụng đúng field name 'avatarUrl'
+      const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+      currentUser.avatarUrl = data.avatarUrl;
+      localStorage.setItem('user', JSON.stringify(currentUser));
+      
+      // ✅ Cập nhật avatarUrl riêng cho Header hiển thị
+      localStorage.setItem('avatarUrl', fullAvatarUrl);
+      
+      alert('Đã cập nhật ảnh đại diện!');
+      
+      // Reload trang để Header cập nhật avatar
+      window.location.reload();
+    } catch (error) {
+      console.error('❌ Error uploading avatar:', error);
+      alert('Có lỗi khi upload ảnh đại diện: ' + error.message);
     }
-  } else {
-    setIsEditing(true);
-  }
+  };
+
+  const handleEdit = async () => {
+    if (isEditing) {
+      if (isSaving) {
+        console.log('⚠️ Đang lưu...');
+        return;
+      }
+      setIsSaving(true);
+      try {
+        const token = localStorage.getItem('token');
+        const dataToSend = {
+          fullName: userData.fullName,
+          hocCap: userData.hocCap,
+          lop: userData.lop,
+          chuyenNganh: userData.chuyenNganh,
+          phone: userData.phone,
+          bio: userData.bio
+        };
+
+        const response = await fetch('http://localhost:5000/api/users/me', {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify(dataToSend)
+        });
+
+        // ✅ FIX: Chỉ gọi response.json() MỘT LẦN
+        const responseData = await response.json();
+
+        if (!response.ok) {
+          throw new Error(responseData.message || 'Failed to update');
+        }
+
+        // ✅ Cập nhật localStorage với dữ liệu mới
+        const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+        const updatedUser = { ...currentUser, ...responseData };
+        localStorage.setItem('user', JSON.stringify(updatedUser));
+        
+        // ✅ Cập nhật state UI
+        setUserData(prev => ({
+          ...prev,
+          fullName: responseData.fullName || '',
+          hocCap: responseData.hocCap || '',
+          lop: responseData.lop || '',
+          chuyenNganh: responseData.chuyenNganh || '',
+          phone: responseData.phone || '',
+          bio: responseData.bio || ''
+        }));
+        
+        console.log('✅ Profile updated:', responseData);
+        alert('✅ Đã lưu thông tin hồ sơ!');
+        setIsEditing(false);
+      } catch (err) {
+        console.error('❌ Error updating profile:', err);
+        alert('Có lỗi khi lưu thông tin: ' + err.message);
+      } finally {
+        setIsSaving(false);
+      }
+    } else {
+      setIsEditing(true);
+    }
   };
 
   return (
@@ -475,7 +520,7 @@ export default function ProfilePage() {
                             e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.06)';
                           }}
                         >
-                          <div style={cardStyle}>📄</div>
+                          <DocumentCover coverImage={doc.coverImage} title={doc.title} />
                           <div style={{ padding: '15px' }}>
                             <div style={{
                               fontWeight: 'bold',
@@ -536,6 +581,7 @@ export default function ProfilePage() {
           </div>
         </div>
       </div>
+      <Footer />
     </div>
   );
 }

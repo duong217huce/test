@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Header from './Header';
+import Footer from './Footer';
 import AdminNotificationBell from './AdminNotificationBell';
 import { colors } from '../theme/colors';
 import { showToast } from '../utils/toast';
@@ -509,6 +510,7 @@ export default function AdminDashboard() {
           </div>
         )}
       </div>
+      <Footer />
     </div>
   );
 }

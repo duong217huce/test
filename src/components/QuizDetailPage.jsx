@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import Header from './Header';
+import Footer from './Footer';
 
 export default function QuizDetailPage() {
   const { id } = useParams();
@@ -445,6 +446,7 @@ export default function QuizDetailPage() {
           </div>
         </div>
       )}
+      <Footer />
     </div>
   );
 }

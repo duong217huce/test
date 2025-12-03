@@ -1,7 +1,27 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Header from './Header';
+import Footer from './Footer';
 import { refreshUserData } from '../utils/userUtils';
+
+// ✅ 3 ảnh bìa mẫu từ Unsplash
+const sampleCovers = [
+  {
+    id: 1,
+    url: 'https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?w=400&h=600&fit=crop',
+    name: 'Sách & Bút'
+  },
+  {
+    id: 2,
+    url: 'https://images.unsplash.com/photo-1497633762265-9d179a990aa6?w=400&h=600&fit=crop',
+    name: 'Thư viện'
+  },
+  {
+    id: 3,
+    url: 'https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=400&h=600&fit=crop',
+    name: 'Học tập'
+  }
+];
 
 const gradeOptions = [
   'Lớp 1', 'Lớp 2', 'Lớp 3', 'Lớp 4', 'Lớp 5',
@@ -31,13 +51,15 @@ export default function UploadPage() {
     title: '',
     description: '',
     file: null,
-    coverImage: null, // ✅ THÊM
+    coverImage: null,
+    coverImageUrl: null, // ✅ URL ảnh bìa mẫu (nếu chọn)
     grade: '',
     subject: ''
   });
   const [uploading, setUploading] = useState(false);
   const [availableSubjects, setAvailableSubjects] = useState([]);
-  const [coverPreview, setCoverPreview] = useState(null); // ✅ THÊM
+  const [coverPreview, setCoverPreview] = useState(null);
+  const [selectedSampleCover, setSelectedSampleCover] = useState(null); // ✅ ID ảnh mẫu đã chọn
 
   // ✅ Cập nhật danh sách môn học khi thay đổi cấp học
   useEffect(() => {
@@ -101,7 +123,7 @@ export default function UploadPage() {
     }
   };
 
-  // ✅ THÊM: Xử lý upload ảnh bìa
+  // ✅ Xử lý upload ảnh bìa từ file
   const handleCoverImageChange = (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -117,7 +139,9 @@ export default function UploadPage() {
         return;
       }
 
-      setFormData(prev => ({ ...prev, coverImage: file }));
+      // Reset ảnh mẫu đã chọn
+      setSelectedSampleCover(null);
+      setFormData(prev => ({ ...prev, coverImage: file, coverImageUrl: null }));
 
       // Preview ảnh
       const reader = new FileReader();
@@ -126,6 +150,28 @@ export default function UploadPage() {
       };
       reader.readAsDataURL(file);
     }
+  };
+
+  // ✅ Xử lý chọn ảnh bìa mẫu
+  const handleSelectSampleCover = (sample) => {
+    if (selectedSampleCover === sample.id) {
+      // Bỏ chọn nếu click lại
+      setSelectedSampleCover(null);
+      setCoverPreview(null);
+      setFormData(prev => ({ ...prev, coverImage: null, coverImageUrl: null }));
+    } else {
+      // Chọn ảnh mẫu
+      setSelectedSampleCover(sample.id);
+      setCoverPreview(sample.url);
+      setFormData(prev => ({ ...prev, coverImage: null, coverImageUrl: sample.url }));
+    }
+  };
+
+  // ✅ Xóa ảnh bìa đã chọn
+  const handleRemoveCover = () => {
+    setSelectedSampleCover(null);
+    setCoverPreview(null);
+    setFormData(prev => ({ ...prev, coverImage: null, coverImageUrl: null }));
   };
 
   const handleDragOver = (e) => {
@@ -174,9 +220,13 @@ export default function UploadPage() {
     apiData.append('price', 0);
     apiData.append('file', formData.file);
     
-    // ✅ THÊM: Upload ảnh bìa
+    // ✅ Upload ảnh bìa (file hoặc URL)
     if (formData.coverImage) {
+      // Ảnh bìa từ file upload
       apiData.append('coverImage', formData.coverImage);
+    } else if (formData.coverImageUrl) {
+      // Ảnh bìa mẫu (URL)
+      apiData.append('coverImageUrl', formData.coverImageUrl);
     }
 
     const token = localStorage.getItem('token');
@@ -204,7 +254,8 @@ export default function UploadPage() {
         // ✅ SỬ DỤNG HELPER ĐỂ CẬP NHẬT DP
         await refreshUserData();
         
-        const newCoins = parseInt(localStorage.getItem('userCoins') || '0');
+        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        const newCoins = user.coins || 0;
         
         alert(`Tài liệu đã được upload thành công!\nDanh mục: ${selectedInfo}\n\n✅ Bạn nhận được 10 DP!\nSố dư hiện tại: ${newCoins} DP`);
         
@@ -308,7 +359,7 @@ export default function UploadPage() {
             />
           </div>
 
-          {/* ✅ THÊM: Upload ảnh bìa */}
+          {/* ✅ Ảnh bìa tài liệu */}
           <div style={{ marginBottom: '25px' }}>
             <label style={{
               display: 'block',
@@ -317,19 +368,117 @@ export default function UploadPage() {
               fontSize: '15px',
               fontWeight: 'normal'
             }}>
-              Ảnh bìa tài liệu <span style={{ color: '#888', fontSize: '13px' }}>(Không bắt buộc)</span>
+              Ảnh bìa tài liệu <span style={{ color: '#888', fontSize: '13px' }}>(Không bắt buộc - nếu không chọn sẽ tự động lấy trang đầu của tài liệu)</span>
             </label>
             
+            {/* ✅ 3 Ảnh bìa mẫu */}
+            <div style={{ marginBottom: '16px' }}>
+              <div style={{ fontSize: '13px', color: '#666', marginBottom: '10px', fontWeight: '500' }}>
+                📚 Chọn ảnh bìa mẫu:
+              </div>
+              <div style={{ display: 'flex', gap: '12px' }}>
+                {sampleCovers.map(sample => (
+                  <div
+                    key={sample.id}
+                    onClick={() => handleSelectSampleCover(sample)}
+                    style={{
+                      width: '100px',
+                      height: '140px',
+                      borderRadius: '8px',
+                      overflow: 'hidden',
+                      cursor: 'pointer',
+                      border: selectedSampleCover === sample.id 
+                        ? '3px solid #4ba3d6' 
+                        : '2px solid #ddd',
+                      transition: 'all 0.2s',
+                      position: 'relative',
+                      boxShadow: selectedSampleCover === sample.id 
+                        ? '0 4px 12px rgba(75, 163, 214, 0.3)' 
+                        : '0 2px 4px rgba(0,0,0,0.1)'
+                    }}
+                  >
+                    <img 
+                      src={sample.url} 
+                      alt={sample.name}
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'cover'
+                      }}
+                    />
+                    {selectedSampleCover === sample.id && (
+                      <div style={{
+                        position: 'absolute',
+                        top: '4px',
+                        right: '4px',
+                        background: '#4ba3d6',
+                        color: '#fff',
+                        borderRadius: '50%',
+                        width: '20px',
+                        height: '20px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: '12px'
+                      }}>
+                        ✓
+                      </div>
+                    )}
+                    <div style={{
+                      position: 'absolute',
+                      bottom: 0,
+                      left: 0,
+                      right: 0,
+                      background: 'linear-gradient(transparent, rgba(0,0,0,0.7))',
+                      color: '#fff',
+                      fontSize: '10px',
+                      padding: '4px',
+                      textAlign: 'center'
+                    }}>
+                      {sample.name}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Hoặc upload ảnh riêng */}
+            <div style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '12px',
+              marginBottom: '16px'
+            }}>
+              <div style={{ 
+                flex: 1, 
+                height: '1px', 
+                background: '#ddd' 
+              }}></div>
+              <span style={{ 
+                color: '#888', 
+                fontSize: '12px',
+                fontWeight: '500'
+              }}>
+                HOẶC
+              </span>
+              <div style={{ 
+                flex: 1, 
+                height: '1px', 
+                background: '#ddd' 
+              }}></div>
+            </div>
+            
             <div style={{ display: 'flex', gap: '20px', alignItems: 'flex-start' }}>
-              {/* Preview ảnh */}
+              {/* Preview ảnh đã chọn */}
               {coverPreview && (
                 <div style={{
-                  width: '200px',
-                  height: '280px',
+                  width: '140px',
+                  height: '196px',
                   border: '2px solid #4ba3d6',
                   borderRadius: '8px',
                   overflow: 'hidden',
-                  flexShrink: 0
+                  flexShrink: 0,
+                  position: 'relative'
                 }}>
                   <img 
                     src={coverPreview} 
@@ -340,6 +489,29 @@ export default function UploadPage() {
                       objectFit: 'cover'
                     }}
                   />
+                  {/* Nút xóa */}
+                  <button
+                    type="button"
+                    onClick={handleRemoveCover}
+                    style={{
+                      position: 'absolute',
+                      top: '4px',
+                      right: '4px',
+                      background: 'rgba(0,0,0,0.6)',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: '50%',
+                      width: '24px',
+                      height: '24px',
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}
+                  >
+                    ✕
+                  </button>
                 </div>
               )}
 
@@ -357,7 +529,7 @@ export default function UploadPage() {
                   onClick={() => document.getElementById('coverImageInput').click()}
                   style={{
                     padding: '12px 24px',
-                    background: '#4ba3d6',
+                    background: coverPreview && !selectedSampleCover ? '#0d7a4f' : '#4ba3d6',
                     color: '#fff',
                     border: 'none',
                     borderRadius: '6px',
@@ -367,7 +539,7 @@ export default function UploadPage() {
                     marginBottom: '10px'
                   }}
                 >
-                  {coverPreview ? '📷 Thay đổi ảnh bìa' : '📷 Chọn ảnh bìa'}
+                  {coverPreview && !selectedSampleCover ? '📷 Thay đổi ảnh' : '📷 Upload ảnh riêng'}
                 </button>
                 <div style={{ fontSize: '12px', color: '#888', marginTop: '8px' }}>
                   • Định dạng: JPG, PNG, GIF<br/>
@@ -638,6 +810,7 @@ export default function UploadPage() {
           </div>
         </form>
       </div>
+      <Footer />
     </div>
   );
 }

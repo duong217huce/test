@@ -13,11 +13,11 @@ const menuItems = [
 ];
 
 const menuRoutes = {
-  'Giáo dục phổ thông': '/category/Giáo dục phổ thông',
-  'Tài liệu chuyên môn': '/category/Tài liệu chuyên môn',
-  'Văn học - Truyện chữ': '/category/Văn học - Truyện chữ',
-  'Văn mẫu - Biểu mẫu': '/category/Văn mẫu - Biểu mẫu',
-  'Luận văn - Báo Cáo': '/category/Luận văn - Báo Cáo',
+  'Giáo dục phổ thông': '/category/education',
+  'Tài liệu chuyên môn': '/category/professional',
+  'Văn học - Truyện chữ': '/category/literature',
+  'Văn mẫu - Biểu mẫu': '/category/templates',
+  'Luận văn - Báo Cáo': '/category/thesis',
   'Ôn tập trắc nghiệm': '/quiz'
 };
 
@@ -59,7 +59,7 @@ export default function Header() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [username, setUsername] = useState('');
-  const [userCoins, setUserCoins] = useState(0);
+  const [coins, setCoins] = useState(0);
   const [showDropdown, setShowDropdown] = useState(false);
   const [activeDropdown, setActiveDropdown] = useState(null);
   const userMenuRef = useRef(null);
@@ -71,15 +71,36 @@ export default function Header() {
   const searchRef = useRef(null);
 
   useEffect(() => {
-    const loggedIn = localStorage.getItem('isLoggedIn') === 'true';
-    const admin = localStorage.getItem('isAdmin') === 'true';
-    const user = localStorage.getItem('username') || '';
-    const coins = localStorage.getItem('userCoins') || '0';
+    const updateUserInfo = () => {
+      const loggedIn = localStorage.getItem('isLoggedIn') === 'true';
+      const admin = localStorage.getItem('isAdmin') === 'true';
+      const user = localStorage.getItem('username') || '';
+      const userData = JSON.parse(localStorage.getItem('user') || '{}');
+      const coinsValue = userData.coins || 0;
+      
+      setIsLoggedIn(loggedIn);
+      setIsAdmin(admin);
+      setUsername(user);
+      setCoins(coinsValue);
+    };
+
+    // Initial load
+    updateUserInfo();
+
+    // Listen for storage changes (when payment callback updates coins)
+    const handleStorageChange = () => {
+      updateUserInfo();
+    };
+
+    window.addEventListener('storage', handleStorageChange);
     
-    setIsLoggedIn(loggedIn);
-    setIsAdmin(admin);
-    setUsername(user);
-    setUserCoins(parseInt(coins));
+    // Also listen for custom event (for same-tab updates)
+    window.addEventListener('coinsUpdated', handleStorageChange);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('coinsUpdated', handleStorageChange);
+    };
   }, []);
 
   useEffect(() => {
@@ -142,7 +163,7 @@ export default function Header() {
     setIsLoggedIn(false);
     setIsAdmin(false);
     setUsername('');
-    setUserCoins(0);
+    setCoins(0);
     setShowDropdown(false);
     showToast('Đã đăng xuất thành công', 'success');
     navigate('/');
@@ -172,7 +193,7 @@ export default function Header() {
     }}>
       {/* Container chung - căn giữa */}
       <div style={{ 
-        maxWidth: '1200px',
+        maxWidth: '1300px',
         margin: '0 auto',
         paddingLeft: '20px',
         paddingRight: '20px'
@@ -415,7 +436,7 @@ export default function Header() {
                   }}
                   title="Nhấn để nạp tiền"
                 >
-                  <span style={{ fontSize: '14px' }}>{userCoins} DP</span>
+                  <span style={{ fontSize: '14px' }}>{coins} DP</span>
                 </div>
               )
             )}

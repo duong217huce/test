@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import Header from './Header';
+import Footer from './Footer';
 import FilterBar from './FilterBar';
 import { filterConfigs } from '../data/filterConfigs';
+import { colors } from '../theme/colors';
 
 const categoryTitles = {
   'education': 'Giáo dục phổ thông',
@@ -40,72 +42,42 @@ const categoryHierarchy = {
                'Luật', 'Hành chính', 'Kinh tế']
 };
 
-const categoryConfigs = {
-  education: {
-    sidebar: [
-      { title: 'Tài liệu mới', active: false },
-      { title: 'SGK Tiểu học', active: false },
-      { title: 'SGK THCS', active: false },
-      { title: 'SGK THPT', active: true },
-      { title: 'Giáo trình đại cương', active: false }
-    ]
-  },
-  professional: {
-    sidebar: [
-      { title: 'Kinh tế', active: true },
-      { title: 'Công nghệ', active: false },
-      { title: 'Y học', active: false },
-      { title: 'Luật', active: false },
-      { title: 'Kiến trúc', active: false }
-    ]
-  },
-  literature: {
-    sidebar: [
-      { title: 'Văn học Việt Nam', active: true },
-      { title: 'Văn học nước ngoài', active: false },
-      { title: 'Truyện', active: false },
-      { title: 'Thơ', active: false },
-      { title: 'Tiểu thuyết', active: false }
-    ]
-  },
-  templates: {
-    sidebar: [
-      { title: 'Văn mẫu', active: true },
-      { title: 'Biểu mẫu hành chính', active: false },
-      { title: 'Biểu mẫu học tập', active: false },
-      { title: 'Hợp đồng', active: false }
-    ]
-  },
-  thesis: {
-    sidebar: [
-      { title: 'Luận văn cử nhân', active: true },
-      { title: 'Luận văn thạc sĩ', active: false },
-      { title: 'Luận văn tiến sĩ', active: false },
-      { title: 'Báo cáo thực tập', active: false },
-      { title: 'Đề tài nghiên cứu', active: false }
-    ]
-  },
-  practice: {
-    sidebar: [
-      { title: 'THPT Quốc gia', active: true },
-      { title: 'Đại học', active: false },
-      { title: 'Chứng chỉ', active: false },
-      { title: 'Thi công chức', active: false }
-    ]
-  }
-};
+// ✅ Component hiển thị ảnh bìa tài liệu
+function DocumentCover({ coverImage, title }) {
+  const [imageError, setImageError] = React.useState(false);
+  
+  const containerStyle = {
+    background: '#b4cbe0',
+    width: '100%',
+    height: '180px',
+    borderRadius: '7px 7px 0 0',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    color: '#fff',
+    fontSize: '48px',
+    overflow: 'hidden'
+  };
 
-const cardStyle = {
-  background: '#b4cbe0',
-  width: '100%',
-  height: '180px',
-  borderRadius: '7px 7px 0 0',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  color: '#fff',
-  fontSize: '14px'
-};
+  if (coverImage && !imageError) {
+    return (
+      <div style={containerStyle}>
+        <img 
+          src={coverImage}
+          alt={title}
+          onError={() => setImageError(true)}
+          style={{
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover'
+          }}
+        />
+      </div>
+    );
+  }
+  
+  return <div style={containerStyle}>📄</div>;
+}
 
 export default function CategoryPage() {
   const { category } = useParams();
@@ -114,9 +86,6 @@ export default function CategoryPage() {
   const [filteredDocs, setFilteredDocs] = useState([]);
   const [allDocs, setAllDocs] = useState([]);
   const [loading, setLoading] = useState(true);
-  
-  const defaultActive = categoryConfigs[category]?.sidebar.find(cat => cat.active)?.title || '';
-  const [activeCategory, setActiveCategory] = useState(defaultActive);
 
   // Fetch documents from backend
   useEffect(() => {
@@ -186,7 +155,6 @@ export default function CategoryPage() {
         })));
         
         setAllDocs(filtered);
-        setFilteredDocs(filtered);
       } catch (error) {
         console.error('❌ Lỗi khi tải tài liệu:', error);
         setAllDocs([]);
@@ -197,13 +165,18 @@ export default function CategoryPage() {
     };
 
     fetchDocuments();
+    // Reset filters khi category thay đổi
+    setSelectedFilters({});
+    setSearchKeyword('');
   }, [category]);
 
-  const handleFilterChange = (key, value) => {
-    setSelectedFilters(prev => ({ ...prev, [key]: value }));
-  };
+  // Function để lọc tài liệu
+  const applyFilters = React.useCallback(() => {
+    if (allDocs.length === 0) {
+      setFilteredDocs([]);
+      return;
+    }
 
-  const handleApply = () => {
     let filtered = [...allDocs];
     
     // Filter theo tags
@@ -236,17 +209,41 @@ export default function CategoryPage() {
     }
     
     setFilteredDocs(filtered);
-    
-    if (filtered.length === 0) {
-      alert('Không tìm thấy tài liệu phù hợp!');
+  }, [allDocs, selectedFilters, searchKeyword]);
+
+  // Tự động lọc khi allDocs thay đổi (sau khi fetch)
+  useEffect(() => {
+    applyFilters();
+  }, [allDocs, applyFilters]);
+
+  // Tự động lọc khi selectedFilters thay đổi
+  useEffect(() => {
+    applyFilters();
+  }, [selectedFilters, applyFilters]);
+
+  // Tự động lọc khi searchKeyword thay đổi (với debounce)
+  useEffect(() => {
+    if (searchKeyword.trim() === '') {
+      // Nếu search rỗng, chỉ áp dụng filters khác
+      applyFilters();
+      return;
     }
+
+    // Debounce cho tìm kiếm (300ms giống Header)
+    const timer = setTimeout(() => {
+      applyFilters();
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [searchKeyword, applyFilters]);
+
+  const handleFilterChange = (key, value) => {
+    setSelectedFilters(prev => ({ ...prev, [key]: value }));
   };
 
-  const handleSidebarChange = (catTitle) => {
-    setActiveCategory(catTitle);
-    setSelectedFilters({});
-    setSearchKeyword('');
-    setFilteredDocs(allDocs);
+  const handleApply = () => {
+    // Không cần làm gì vì đã tự động lọc
+    applyFilters();
   };
 
   const handleClearFilters = () => {
@@ -260,9 +257,9 @@ export default function CategoryPage() {
       <Header />
       <div style={{ height: '130px' }}></div>
       
-      <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '20px' }}>
+      <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '40px 80px' }}>
         <h1 style={{
-          color: '#133a5c',
+          color: colors.headline,
           fontSize: '28px',
           marginBottom: '20px',
           fontWeight: 'bold'
@@ -277,259 +274,131 @@ export default function CategoryPage() {
           searchKeyword={searchKeyword}
           onSearchChange={setSearchKeyword}
           onApply={handleApply}
+          showApplyButton={false}
         />
         
         {loading ? (
-          <div style={{ textAlign: 'center', padding: '60px', color: '#888' }}>
+          <div style={{ textAlign: 'center', padding: '60px', color: colors.text2 }}>
             Đang tải tài liệu...
           </div>
         ) : (
-          categoryConfigs[category]?.sidebar ? (
-            <div style={{ display: 'flex', gap: '20px' }}>
-              <aside style={{
-                width: '220px',
-                flexShrink: 0,
-                background: '#fff',
-                borderRadius: '8px',
-                padding: '15px',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
-                height: 'fit-content',
-                position: 'sticky',
-                top: '150px'
-              }}>
-                {categoryConfigs[category].sidebar.map((cat, idx) => (
-                  <div
-                    key={idx}
-                    onClick={() => handleSidebarChange(cat.title)}
-                    style={{
-                      padding: '12px 15px',
-                      marginBottom: '8px',
-                      borderRadius: '6px',
-                      cursor: 'pointer',
-                      background: activeCategory === cat.title ? '#e8f4f8' : 'transparent',
-                      color: activeCategory === cat.title ? '#133a5c' : '#2d4a67',
-                      fontWeight: activeCategory === cat.title ? 'bold' : 'normal',
-                      fontSize: '15px',
-                      transition: 'all 0.2s'
-                    }}
-                    onMouseEnter={(e) => {
-                      if (activeCategory !== cat.title) {
-                        e.target.style.background = '#f5f5f5';
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      if (activeCategory !== cat.title) {
-                        e.target.style.background = 'transparent';
-                      }
-                    }}
-                  >
-                    {cat.title}
-                  </div>
-                ))}
-              </aside>
-              
-              <div style={{ flex: 1 }}>
-                {/* Filter results info */}
-                <div style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  marginBottom: '20px',
-                  padding: '15px',
-                  background: '#f5f9fc',
-                  borderRadius: '6px'
-                }}>
-                  <div style={{ fontSize: '14px', color: '#2d4a67' }}>
-                    Tìm thấy <strong style={{ color: '#133a5c' }}>{filteredDocs.length}</strong> tài liệu
-                    {(Object.values(selectedFilters).some(v => v && v !== 'Tất cả') || searchKeyword) && (
-                      <span style={{ color: '#888' }}> (đã lọc)</span>
-                    )}
-                  </div>
-                  
-                  {(Object.values(selectedFilters).some(v => v && v !== 'Tất cả') || searchKeyword) && (
-                    <button
-                      onClick={handleClearFilters}
-                      style={{
-                        padding: '8px 16px',
-                        background: '#fff',
-                        border: '1px solid #ccc',
-                        borderRadius: '6px',
-                        fontSize: '13px',
-                        cursor: 'pointer',
-                        color: '#2d4a67'
-                      }}
-                    >
-                      ✕ Xóa bộ lọc
-                    </button>
-                  )}
-                </div>
-
-                {filteredDocs.length === 0 ? (
-                  <div style={{
-                    textAlign: 'center',
-                    padding: '60px 20px',
-                    background: '#fff',
-                    borderRadius: '8px',
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.06)'
-                  }}>
-                    <div style={{ fontSize: '50px', marginBottom: '15px' }}>📭</div>
-                    <h3 style={{ color: '#133a5c', marginBottom: '10px' }}>
-                      Chưa có tài liệu nào
-                    </h3>
-                    <p style={{ color: '#888' }}>
-                      Hãy là người đầu tiên chia sẻ tài liệu cho danh mục này!
-                    </p>
-                  </div>
-                ) : (
-                  <div style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
-                    gap: '20px'
-                  }}>
-                    {filteredDocs.map((doc) => (
-                      <Link
-                        to={`/document/${doc._id}`}
-                        key={doc._id}
-                        style={{
-                          textDecoration: 'none',
-                          color: 'inherit'
-                        }}
-                      >
-                        <div
-                          style={{
-                            background: '#fff',
-                            borderRadius: '7px',
-                            boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
-                            cursor: 'pointer',
-                            transition: 'transform 0.2s, box-shadow 0.2s'
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.transform = 'translateY(-4px)';
-                            e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.12)';
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.transform = 'translateY(0)';
-                            e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.06)';
-                          }}
-                        >
-                          <div style={cardStyle}>
-                            📄
-                          </div>
-                          <div style={{ padding: '12px' }}>
-                            <div style={{
-                              fontWeight: 'bold',
-                              color: '#133a5c',
-                              fontSize: '14px',
-                              marginBottom: '8px'
-                            }}>
-                              {doc.title}
-                            </div>
-                            <div style={{
-                              fontSize: '12px',
-                              color: '#2d4a67',
-                              marginBottom: '4px'
-                            }}>
-                              {doc.category}
-                            </div>
-                            <div style={{
-                              fontSize: '11px',
-                              color: '#888'
-                            }}>
-                              Đăng tải bởi: {doc.uploadedBy?.username || 'Unknown'}
-                            </div>
-                          </div>
-                        </div>
-                      </Link>
-                    ))}
-                  </div>
+          <div>
+            {/* Filter results info */}
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '20px',
+              padding: '15px',
+              background: '#f5f9fc',
+              borderRadius: '6px'
+            }}>
+              <div style={{ fontSize: '14px', color: '#2d4a67' }}>
+                Tìm thấy <strong style={{ color: '#133a5c' }}>{filteredDocs.length}</strong> tài liệu
+                {(Object.values(selectedFilters).some(v => v && v !== 'Tất cả') || searchKeyword) && (
+                  <span style={{ color: '#888' }}> (đã lọc)</span>
                 )}
               </div>
-            </div>
-          ) : (
-            <div>
-              {filteredDocs.length === 0 ? (
-                <div style={{
-                  textAlign: 'center',
-                  padding: '60px 20px',
-                  background: '#fff',
-                  borderRadius: '8px',
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.06)'
-                }}>
-                  <div style={{ fontSize: '50px', marginBottom: '15px' }}>📭</div>
-                  <h3 style={{ color: '#133a5c', marginBottom: '10px' }}>
-                    Chưa có tài liệu nào
-                  </h3>
-                  <p style={{ color: '#888' }}>
-                    Hãy là người đầu tiên chia sẻ tài liệu cho danh mục này!
-                  </p>
-                </div>
-              ) : (
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
-                  gap: '20px'
-                }}>
-                  {filteredDocs.map((doc) => (
-                    <Link
-                      to={`/document/${doc._id}`}
-                      key={doc._id}
-                      style={{
-                        textDecoration: 'none',
-                        color: 'inherit'
-                      }}
-                    >
-                      <div
-                        style={{
-                          background: '#fff',
-                          borderRadius: '7px',
-                          boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
-                          cursor: 'pointer',
-                          transition: 'transform 0.2s, box-shadow 0.2s'
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.transform = 'translateY(-4px)';
-                          e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.12)';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.transform = 'translateY(0)';
-                          e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.06)';
-                        }}
-                      >
-                        <div style={cardStyle}>
-                          📄
-                        </div>
-                        <div style={{ padding: '12px' }}>
-                          <div style={{
-                            fontWeight: 'bold',
-                            color: '#133a5c',
-                            fontSize: '14px',
-                            marginBottom: '8px'
-                          }}>
-                            {doc.title}
-                          </div>
-                          <div style={{
-                            fontSize: '12px',
-                            color: '#2d4a67',
-                            marginBottom: '4px'
-                          }}>
-                            {doc.category}
-                          </div>
-                          <div style={{
-                            fontSize: '11px',
-                            color: '#888'
-                          }}>
-                            Đăng tải bởi: {doc.uploadedBy?.username || 'Unknown'}
-                          </div>
-                        </div>
-                      </div>
-                    </Link>
-                  ))}
-                </div>
+              
+              {(Object.values(selectedFilters).some(v => v && v !== 'Tất cả') || searchKeyword) && (
+                <button
+                  onClick={handleClearFilters}
+                  style={{
+                    padding: '8px 16px',
+                    background: '#fff',
+                    border: '1px solid #ccc',
+                    borderRadius: '6px',
+                    fontSize: '13px',
+                    cursor: 'pointer',
+                    color: colors.paragraph
+                  }}
+                >
+                  ✕ Xóa bộ lọc
+                </button>
               )}
             </div>
-          )
+
+            {filteredDocs.length === 0 ? (
+              <div style={{
+                textAlign: 'center',
+                padding: '60px 20px',
+                background: '#fff',
+                borderRadius: '8px',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.06)'
+              }}>
+                <div style={{ fontSize: '50px', marginBottom: '15px' }}>📭</div>
+                <h3 style={{ color: '#133a5c', marginBottom: '10px' }}>
+                  Chưa có tài liệu nào
+                </h3>
+                <p style={{ color: '#888' }}>
+                  Hãy là người đầu tiên chia sẻ tài liệu cho danh mục này!
+                </p>
+              </div>
+            ) : (
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
+                gap: '20px'
+              }}>
+                {filteredDocs.map((doc) => (
+                  <Link
+                    to={`/document/${doc._id}`}
+                    key={doc._id}
+                    style={{
+                      textDecoration: 'none',
+                      color: 'inherit'
+                    }}
+                  >
+                    <div
+                      style={{
+                        background: '#fff',
+                        borderRadius: '7px',
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+                        cursor: 'pointer',
+                        transition: 'transform 0.2s, box-shadow 0.2s'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.transform = 'translateY(-4px)';
+                        e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.12)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.transform = 'translateY(0)';
+                        e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.06)';
+                      }}
+                    >
+                      <DocumentCover coverImage={doc.coverImage} title={doc.title} />
+                      <div style={{ padding: '12px' }}>
+                        <div style={{
+                          fontWeight: 'bold',
+                          color: colors.headline,
+                          fontSize: '14px',
+                          marginBottom: '8px'
+                        }}>
+                          {doc.title}
+                        </div>
+                        <div style={{
+                          fontSize: '12px',
+                          color: colors.paragraph,
+                          marginBottom: '4px'
+                        }}>
+                          {doc.category}
+                        </div>
+                        <div style={{
+                          fontSize: '11px',
+                          color: '#888'
+                        }}>
+                          Đăng tải bởi: {doc.uploadedBy?.username || 'Unknown'}
+                        </div>
+                      </div>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </div>
         )}
       </div>
+      <Footer />
     </div>
   );
 }

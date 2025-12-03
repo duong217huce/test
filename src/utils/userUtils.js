@@ -18,9 +18,9 @@ export const refreshUserData = async () => {
       
       // Cập nhật localStorage
       localStorage.setItem('user', JSON.stringify(userData));
-      localStorage.setItem('userCoins', userData.coins.toString());
       localStorage.setItem('username', userData.username);
       localStorage.setItem('fullName', userData.fullName || '');
+      // Coins is already in user object, no need to save separately
       
       console.log('✅ User data refreshed:', userData.username, '| Coins:', userData.coins);
       return true;

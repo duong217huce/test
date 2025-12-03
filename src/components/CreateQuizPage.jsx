@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Header from './Header';
+import Footer from './Footer';
+import Groq from 'groq-sdk';
 
 const gradeOptions = [
   'Lớp 1', 'Lớp 2', 'Lớp 3', 'Lớp 4', 'Lớp 5',
@@ -47,6 +49,16 @@ export default function CreateQuizPage() {
       { content: '', isCorrect: false },
       { content: '', isCorrect: false }
     ]
+  });
+
+  // AI Generation states
+  const [aiGenerating, setAiGenerating] = useState(false);
+  const [aiFormData, setAiFormData] = useState({
+    grade: '',
+    subject: '',
+    numQuestions: 20,
+    topics: '',
+    difficulty: 'Trung bình'
   });
 
   // ==================== TAB 1 FUNCTIONS ====================
@@ -252,6 +264,170 @@ export default function CreateQuizPage() {
     }
   };
 
+  // ==================== TAB 3: AI GENERATION FUNCTIONS ====================
+  
+  const handleAiFormChange = (e) => {
+    const { name, value } = e.target;
+    setAiFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const generateQuizWithAI = async () => {
+    if (!aiFormData.grade || !aiFormData.subject) {
+      alert('Vui lòng chọn Môn học và Lớp!');
+      return;
+    }
+
+    if (aiFormData.numQuestions < 5 || aiFormData.numQuestions > 50) {
+      alert('Số câu hỏi phải từ 5 đến 50!');
+      return;
+    }
+
+    setAiGenerating(true);
+
+    try {
+      const API_KEY = import.meta.env.VITE_GROQ_API_KEY;
+      if (!API_KEY) {
+        alert('API key chưa được cấu hình. Vui lòng thêm VITE_GROQ_API_KEY vào file .env');
+        setAiGenerating(false);
+        return;
+      }
+
+      const groq = new Groq({ 
+        apiKey: API_KEY,
+        dangerouslyAllowBrowser: true
+      });
+
+      const prompt = `Bạn là giáo viên chuyên nghiệp. Hãy tạo một đề thi trắc nghiệm ${aiFormData.subject} cho ${aiFormData.grade}.
+
+YÊU CẦU:
+- Tổng số câu hỏi: ${aiFormData.numQuestions}
+- Độ khó: ${aiFormData.difficulty}
+${aiFormData.topics ? `- Chủ đề tập trung: ${aiFormData.topics}` : ''}
+- Mỗi câu hỏi có 4 đáp án (A, B, C, D), chỉ có 1 đáp án đúng
+- Câu hỏi phải phù hợp với trình độ ${aiFormData.grade}
+- Đáp án phải chính xác và rõ ràng
+
+TRẢ VỀ ĐỊNH DẠNG JSON SAU (KHÔNG CÓ MARKDOWN, CHỈ JSON THUẦN):
+{
+  "sections": [
+    {
+      "name": "Tên phần (ví dụ: Phần 1 - Đại số)",
+      "questions": [
+        {
+          "content": "Nội dung câu hỏi",
+          "type": "single",
+          "topic": "Chủ đề câu hỏi",
+          "answers": [
+            {"content": "Đáp án A", "isCorrect": true},
+            {"content": "Đáp án B", "isCorrect": false},
+            {"content": "Đáp án C", "isCorrect": false},
+            {"content": "Đáp án D", "isCorrect": false}
+          ]
+        }
+      ]
+    }
+  ]
+}
+
+LƯU Ý:
+- Chỉ trả về JSON, không có text thêm
+- Đảm bảo mỗi câu hỏi có đúng 1 đáp án đúng (isCorrect: true)
+- Tên phần có thể chia thành nhiều phần nếu cần (ví dụ: Phần 1, Phần 2...)`;
+
+      const chatCompletion = await groq.chat.completions.create({
+        messages: [
+          { 
+            role: 'system', 
+            content: 'Bạn là giáo viên chuyên nghiệp. Trả lời CHỈ bằng JSON, không có text thêm. Đảm bảo JSON hợp lệ.'
+          },
+          { role: 'user', content: prompt }
+        ],
+        model: 'llama-3.3-70b-versatile',
+        temperature: 0.7,
+        max_tokens: 4000,
+        response_format: { type: 'json_object' }
+      });
+
+      const responseText = chatCompletion.choices[0]?.message?.content || '';
+      
+      // Parse JSON response
+      let aiResult;
+      try {
+        // Loại bỏ markdown code blocks nếu có
+        const cleanedText = responseText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+        aiResult = JSON.parse(cleanedText);
+      } catch (parseError) {
+        console.error('Error parsing AI response:', parseError);
+        console.log('Raw response:', responseText);
+        alert('AI trả về định dạng không hợp lệ. Vui lòng thử lại.');
+        setAiGenerating(false);
+        return;
+      }
+
+      // Validate và format kết quả
+      if (!aiResult.sections || !Array.isArray(aiResult.sections)) {
+        alert('Định dạng kết quả từ AI không đúng. Vui lòng thử lại.');
+        setAiGenerating(false);
+        return;
+      }
+
+      // Format sections để phù hợp với quizData structure
+      const formattedSections = aiResult.sections.map((section, idx) => ({
+        name: section.name || `Phần ${idx + 1}`,
+        questions: (section.questions || []).map((q, qIdx) => ({
+          content: q.content || '',
+          type: q.type || 'single',
+          topic: q.topic || '',
+          order: qIdx,
+          answers: (q.answers || []).slice(0, 4).map((ans) => ({
+            content: ans.content || '',
+            isCorrect: ans.isCorrect === true
+          }))
+        }))
+      }));
+
+      // Cập nhật quizData với kết quả từ AI
+      const totalQuestions = formattedSections.reduce((sum, s) => sum + s.questions.length, 0);
+      
+      setQuizData(prev => {
+        const newTitle = prev.title || `Đề thi ${aiFormData.subject} ${aiFormData.grade} - ${aiFormData.difficulty}`;
+        const newDescription = prev.description || `Đề thi trắc nghiệm ${aiFormData.subject} cho ${aiFormData.grade} với ${totalQuestions} câu hỏi${aiFormData.topics ? ` về chủ đề: ${aiFormData.topics}` : ''}`;
+        
+        return {
+          ...prev,
+          grade: aiFormData.grade,
+          subject: aiFormData.subject,
+          sections: formattedSections,
+          title: newTitle,
+          description: newDescription
+        };
+      });
+
+      alert(`✅ Đã tạo thành công ${formattedSections.reduce((sum, s) => sum + s.questions.length, 0)} câu hỏi! Chuyển sang Tab 2 để xem và chỉnh sửa.`);
+      
+      // Chuyển sang Tab 2 để xem kết quả
+      setCurrentTab(2);
+      setCurrentSection(0);
+
+    } catch (error) {
+      console.error('❌ Error generating quiz with AI:', error);
+      
+      let errorMsg = 'Có lỗi xảy ra khi tạo đề thi bằng AI. ';
+      
+      if (error.message?.includes('API key')) {
+        errorMsg += 'API key không hợp lệ.';
+      } else if (error.message?.includes('rate limit')) {
+        errorMsg += 'Quá nhiều request. Vui lòng đợi 1 phút.';
+      } else {
+        errorMsg += 'Vui lòng thử lại.';
+      }
+      
+      alert(errorMsg);
+    } finally {
+      setAiGenerating(false);
+    }
+  };
+
   // Submit toàn bộ quiz
   const handleSubmitQuiz = async (isDraft = false) => {
     if (!validateTab1()) {
@@ -352,6 +528,22 @@ export default function CreateQuizPage() {
             }}
           >
             2. Soạn câu hỏi
+          </button>
+          <button
+            onClick={() => setCurrentTab(3)}
+            style={{
+              padding: '12px 24px',
+              background: currentTab === 3 ? '#4ba3d6' : 'transparent',
+              color: currentTab === 3 ? '#fff' : '#666',
+              border: 'none',
+              borderBottom: currentTab === 3 ? '3px solid #4ba3d6' : 'none',
+              cursor: 'pointer',
+              fontSize: '16px',
+              fontWeight: currentTab === 3 ? 'bold' : 'normal',
+              transition: 'all 0.3s'
+            }}
+          >
+            🤖 3. AI Tạo đề thi
           </button>
         </div>
 
@@ -1015,6 +1207,271 @@ export default function CreateQuizPage() {
           </div>
         )}
 
+        {/* ==================== TAB 3: AI TẠO ĐỀ THI ==================== */}
+        {currentTab === 3 && (
+          <div style={{
+            background: '#fff',
+            borderRadius: '8px',
+            padding: '40px',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.06)'
+          }}>
+            <div style={{
+              textAlign: 'center',
+              marginBottom: '40px'
+            }}>
+              <div style={{ fontSize: '48px', marginBottom: '15px' }}>🤖</div>
+              <h2 style={{
+                color: '#133a5c',
+                fontSize: '24px',
+                fontWeight: 'bold',
+                marginBottom: '10px'
+              }}>
+                Tạo đề thi bằng AI
+              </h2>
+              <p style={{ color: '#666', fontSize: '14px' }}>
+                AI sẽ tự động tạo đề thi trắc nghiệm dựa trên thông tin bạn cung cấp
+              </p>
+            </div>
+
+            <div style={{
+              maxWidth: '600px',
+              margin: '0 auto'
+            }}>
+              {/* Môn học */}
+              <div style={{ marginBottom: '25px' }}>
+                <label style={{
+                  display: 'block',
+                  marginBottom: '8px',
+                  color: '#133a5c',
+                  fontSize: '15px',
+                  fontWeight: 'bold'
+                }}>
+                  Môn học <span style={{ color: '#e84c61' }}>*</span>
+                </label>
+                <select
+                  name="subject"
+                  value={aiFormData.subject}
+                  onChange={handleAiFormChange}
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    fontSize: '14px',
+                    border: '1px solid #ccc',
+                    borderRadius: '6px',
+                    outline: 'none',
+                    boxSizing: 'border-box'
+                  }}
+                >
+                  <option value="">-- Chọn môn học --</option>
+                  {subjectOptions.map(subject => (
+                    <option key={subject} value={subject}>{subject}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Lớp */}
+              <div style={{ marginBottom: '25px' }}>
+                <label style={{
+                  display: 'block',
+                  marginBottom: '8px',
+                  color: '#133a5c',
+                  fontSize: '15px',
+                  fontWeight: 'bold'
+                }}>
+                  Lớp <span style={{ color: '#e84c61' }}>*</span>
+                </label>
+                <select
+                  name="grade"
+                  value={aiFormData.grade}
+                  onChange={handleAiFormChange}
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    fontSize: '14px',
+                    border: '1px solid #ccc',
+                    borderRadius: '6px',
+                    outline: 'none',
+                    boxSizing: 'border-box'
+                  }}
+                >
+                  <option value="">-- Chọn lớp --</option>
+                  {gradeOptions.map(grade => (
+                    <option key={grade} value={grade}>{grade}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Số câu hỏi */}
+              <div style={{ marginBottom: '25px' }}>
+                <label style={{
+                  display: 'block',
+                  marginBottom: '8px',
+                  color: '#133a5c',
+                  fontSize: '15px',
+                  fontWeight: 'bold'
+                }}>
+                  Số câu hỏi <span style={{ color: '#e84c61' }}>*</span>
+                </label>
+                <input
+                  type="number"
+                  name="numQuestions"
+                  value={aiFormData.numQuestions}
+                  onChange={handleAiFormChange}
+                  min="5"
+                  max="50"
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    fontSize: '14px',
+                    border: '1px solid #ccc',
+                    borderRadius: '6px',
+                    outline: 'none',
+                    boxSizing: 'border-box'
+                  }}
+                />
+                <p style={{ marginTop: '5px', fontSize: '12px', color: '#888' }}>
+                  Từ 5 đến 50 câu hỏi
+                </p>
+              </div>
+
+              {/* Chủ đề */}
+              <div style={{ marginBottom: '25px' }}>
+                <label style={{
+                  display: 'block',
+                  marginBottom: '8px',
+                  color: '#133a5c',
+                  fontSize: '15px',
+                  fontWeight: 'bold'
+                }}>
+                  Chủ đề (tùy chọn)
+                </label>
+                <input
+                  type="text"
+                  name="topics"
+                  value={aiFormData.topics}
+                  onChange={handleAiFormChange}
+                  placeholder="VD: Đại số, Hình học, Hóa học hữu cơ..."
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    fontSize: '14px',
+                    border: '1px solid #ccc',
+                    borderRadius: '6px',
+                    outline: 'none',
+                    boxSizing: 'border-box'
+                  }}
+                />
+                <p style={{ marginTop: '5px', fontSize: '12px', color: '#888' }}>
+                  Để trống nếu muốn AI tự chọn chủ đề đa dạng
+                </p>
+              </div>
+
+              {/* Độ khó */}
+              <div style={{ marginBottom: '30px' }}>
+                <label style={{
+                  display: 'block',
+                  marginBottom: '8px',
+                  color: '#133a5c',
+                  fontSize: '15px',
+                  fontWeight: 'bold'
+                }}>
+                  Độ khó
+                </label>
+                <select
+                  name="difficulty"
+                  value={aiFormData.difficulty}
+                  onChange={handleAiFormChange}
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    fontSize: '14px',
+                    border: '1px solid #ccc',
+                    borderRadius: '6px',
+                    outline: 'none',
+                    boxSizing: 'border-box'
+                  }}
+                >
+                  <option value="Dễ">Dễ</option>
+                  <option value="Trung bình">Trung bình</option>
+                  <option value="Khó">Khó</option>
+                  <option value="Rất khó">Rất khó</option>
+                </select>
+              </div>
+
+              {/* Button Generate */}
+              <button
+                onClick={generateQuizWithAI}
+                disabled={aiGenerating}
+                style={{
+                  width: '100%',
+                  padding: '16px',
+                  background: aiGenerating ? '#ccc' : 'linear-gradient(135deg, #4ba3d6 0%, #133a5c 100%)',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '16px',
+                  fontWeight: 'bold',
+                  cursor: aiGenerating ? 'not-allowed' : 'pointer',
+                  transition: 'all 0.3s',
+                  boxShadow: aiGenerating ? 'none' : '0 4px 12px rgba(75, 163, 214, 0.3)'
+                }}
+                onMouseOver={(e) => {
+                  if (!aiGenerating) {
+                    e.target.style.transform = 'translateY(-2px)';
+                    e.target.style.boxShadow = '0 6px 16px rgba(75, 163, 214, 0.4)';
+                  }
+                }}
+                onMouseOut={(e) => {
+                  if (!aiGenerating) {
+                    e.target.style.transform = 'translateY(0)';
+                    e.target.style.boxShadow = '0 4px 12px rgba(75, 163, 214, 0.3)';
+                  }
+                }}
+              >
+                {aiGenerating ? (
+                  <span>
+                    <span style={{ display: 'inline-block', animation: 'spin 1s linear infinite' }}>⏳</span>
+                    {' '}AI đang tạo đề thi...
+                  </span>
+                ) : (
+                  <span>✨ Tạo đề thi bằng AI</span>
+                )}
+              </button>
+
+              {aiGenerating && (
+                <div style={{
+                  marginTop: '20px',
+                  padding: '15px',
+                  background: '#f0f8ff',
+                  borderRadius: '6px',
+                  textAlign: 'center',
+                  color: '#133a5c',
+                  fontSize: '14px'
+                }}>
+                  ⏳ Đang tạo đề thi... Vui lòng đợi trong giây lát (thường mất 10-30 giây)
+                </div>
+              )}
+
+              <div style={{
+                marginTop: '30px',
+                padding: '20px',
+                background: '#f9f9f9',
+                borderRadius: '6px',
+                fontSize: '13px',
+                color: '#666',
+                lineHeight: '1.6'
+              }}>
+                <strong style={{ color: '#133a5c' }}>💡 Lưu ý:</strong>
+                <ul style={{ marginTop: '10px', paddingLeft: '20px' }}>
+                  <li>AI sẽ tạo đề thi với số câu hỏi bạn yêu cầu</li>
+                  <li>Sau khi tạo xong, bạn có thể xem và chỉnh sửa trong Tab 2</li>
+                  <li>Đảm bảo thông tin cơ bản (Tab 1) đã được điền đầy đủ trước khi lưu</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Bottom Actions */}
         {currentTab === 2 && (
           <div style={{
@@ -1076,6 +1533,7 @@ export default function CreateQuizPage() {
           </div>
         )}
       </div>
+      <Footer />
     </div>
   );
 }

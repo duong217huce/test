@@ -1,10 +1,10 @@
 import React from 'react';
 
-export default function PurchaseModal({ isOpen, onClose, onConfirm, document, userCoins }) {
+export default function PurchaseModal({ isOpen, onClose, onConfirm, document, coins }) {
   if (!isOpen) return null;
 
   const price = document?.price || 10;
-  const hasEnough = userCoins >= price;
+  const hasEnough = coins >= price;
 
   return (
     <div style={{
@@ -49,7 +49,7 @@ export default function PurchaseModal({ isOpen, onClose, onConfirm, document, us
             <strong>Giá:</strong> <span style={{ color: '#e84c61', fontSize: '20px', fontWeight: 'bold' }}>{price} DP</span>
           </p>
           <p style={{ color: '#2d4a67' }}>
-            <strong>Số dư hiện tại:</strong> <span style={{ color: hasEnough ? '#0d7a4f' : '#e84c61', fontWeight: 'bold' }}>{userCoins} DP</span>
+            <strong>Số dư hiện tại:</strong> <span style={{ color: hasEnough ? '#0d7a4f' : '#e84c61', fontWeight: 'bold' }}>{coins} DP</span>
           </p>
         </div>
 
@@ -63,7 +63,7 @@ export default function PurchaseModal({ isOpen, onClose, onConfirm, document, us
             marginBottom: '20px',
             fontSize: '14px'
           }}>
-            ⚠️ Số dư không đủ. Vui lòng nạp thêm {price - userCoins} DP.
+            ⚠️ Số dư không đủ. Vui lòng nạp thêm {price - coins} DP.
           </div>
         )}
 

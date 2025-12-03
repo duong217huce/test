@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { colors } from '../theme/colors';
 
 export default function RegisterPage() {
   const [fullName, setFullName] = useState('');
@@ -38,7 +39,8 @@ export default function RegisterPage() {
           username,
           email: email || `${username}@example.com`, // Nếu không nhập email thì tạo mặc định
           password,
-          fullName
+          fullName,
+          phone
         })
       });
 
@@ -69,43 +71,45 @@ export default function RegisterPage() {
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      background: 'linear-gradient(135deg, #eafcff 0%, #b4cbe0 100%)',
-      fontFamily: 'Arial, sans-serif',
+      background: colors.background,
+      fontFamily: 'Montserrat, sans-serif',
       padding: '20px'
     }}>
       <div style={{
-        background: '#fff',
+        background: colors.background,
         padding: '40px',
-        borderRadius: '10px',
-        boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+        borderRadius: '16px',
+        boxShadow: '0 8px 32px rgba(0,0,0,0.08)',
         width: '100%',
-        maxWidth: '500px',
-        border: '2px solid #133a5c'
+        maxWidth: '440px',
+        border: `1px solid ${colors.borderLight}`
       }}>
         <h1 style={{
           textAlign: 'center',
-          color: '#e84c61',
+          color: colors.headline,
           marginBottom: '10px',
           fontSize: '32px',
-          fontWeight: 'bold'
+          fontWeight: '700',
+          letterSpacing: '-0.5px'
         }}>
           EDUCONNECT
         </h1>
         <h2 style={{
           textAlign: 'center',
-          color: '#133a5c',
+          color: colors.text2,
           marginBottom: '30px',
-          fontSize: '20px'
+          fontSize: '14px',
+          fontWeight: '500'
         }}>
-          Đăng ký tài khoản
+          Đăng ký tài khoản mới
         </h2>
 
         {error && (
           <div style={{
             backgroundColor: '#ffebee',
-            color: '#c62828',
+            color: colors.error,
             padding: '12px',
-            borderRadius: '6px',
+            borderRadius: '8px',
             marginBottom: '20px',
             fontSize: '14px',
             textAlign: 'center'
@@ -120,9 +124,9 @@ export default function RegisterPage() {
             <label style={{
               display: 'block',
               marginBottom: '8px',
-              color: '#133a5c',
+              color: colors.headline,
               fontSize: '14px',
-              fontWeight: '500'
+              fontWeight: '600'
             }}>
               Họ và tên
             </label>
@@ -135,7 +139,7 @@ export default function RegisterPage() {
                 width: '100%',
                 padding: '12px',
                 fontSize: '14px',
-                border: '1px solid #ccc',
+                border: `1px solid ${colors.border}`,
                 borderRadius: '6px',
                 outline: 'none',
                 boxSizing: 'border-box'
@@ -149,9 +153,9 @@ export default function RegisterPage() {
             <label style={{
               display: 'block',
               marginBottom: '8px',
-              color: '#133a5c',
+              color: colors.headline,
               fontSize: '14px',
-              fontWeight: '500'
+              fontWeight: '600'
             }}>
               Số điện thoại
             </label>
@@ -164,7 +168,7 @@ export default function RegisterPage() {
                 width: '100%',
                 padding: '12px',
                 fontSize: '14px',
-                border: '1px solid #ccc',
+                border: `1px solid ${colors.border}`,
                 borderRadius: '6px',
                 outline: 'none',
                 boxSizing: 'border-box'
@@ -178,9 +182,9 @@ export default function RegisterPage() {
             <label style={{
               display: 'block',
               marginBottom: '8px',
-              color: '#133a5c',
+              color: colors.headline,
               fontSize: '14px',
-              fontWeight: '500'
+              fontWeight: '600'
             }}>
               Email (tùy chọn)
             </label>
@@ -193,7 +197,7 @@ export default function RegisterPage() {
                 width: '100%',
                 padding: '12px',
                 fontSize: '14px',
-                border: '1px solid #ccc',
+                border: `1px solid ${colors.border}`,
                 borderRadius: '6px',
                 outline: 'none',
                 boxSizing: 'border-box'
@@ -206,9 +210,9 @@ export default function RegisterPage() {
             <label style={{
               display: 'block',
               marginBottom: '8px',
-              color: '#133a5c',
+              color: colors.headline,
               fontSize: '14px',
-              fontWeight: '500'
+              fontWeight: '600'
             }}>
               Tên đăng nhập
             </label>
@@ -220,7 +224,7 @@ export default function RegisterPage() {
                 width: '100%',
                 padding: '12px',
                 fontSize: '14px',
-                border: '1px solid #ccc',
+                border: `1px solid ${colors.border}`,
                 borderRadius: '6px',
                 outline: 'none',
                 boxSizing: 'border-box'
@@ -234,9 +238,9 @@ export default function RegisterPage() {
             <label style={{
               display: 'block',
               marginBottom: '8px',
-              color: '#133a5c',
+              color: colors.headline,
               fontSize: '14px',
-              fontWeight: '500'
+              fontWeight: '600'
             }}>
               Mật khẩu
             </label>
@@ -248,7 +252,7 @@ export default function RegisterPage() {
                 width: '100%',
                 padding: '12px',
                 fontSize: '14px',
-                border: '1px solid #ccc',
+                border: `1px solid ${colors.border}`,
                 borderRadius: '6px',
                 outline: 'none',
                 boxSizing: 'border-box'
@@ -262,9 +266,9 @@ export default function RegisterPage() {
             <label style={{
               display: 'block',
               marginBottom: '8px',
-              color: '#133a5c',
+              color: colors.headline,
               fontSize: '14px',
-              fontWeight: '500'
+              fontWeight: '600'
             }}>
               Xác nhận mật khẩu
             </label>
@@ -276,7 +280,7 @@ export default function RegisterPage() {
                 width: '100%',
                 padding: '12px',
                 fontSize: '14px',
-                border: '1px solid #ccc',
+                border: `1px solid ${colors.border}`,
                 borderRadius: '6px',
                 outline: 'none',
                 boxSizing: 'border-box'
@@ -292,7 +296,7 @@ export default function RegisterPage() {
             style={{
               width: '100%',
               padding: '12px',
-              background: loading ? '#ccc' : '#4ba3d6',
+              background: loading ? colors.border : colors.button,
               color: '#fff',
               border: 'none',
               borderRadius: '6px',
@@ -309,11 +313,11 @@ export default function RegisterPage() {
           <div style={{
             textAlign: 'center',
             fontSize: '14px',
-            color: '#666'
+            color: colors.text2
           }}>
             Đã có tài khoản?{' '}
             <Link to="/login" style={{
-              color: '#4ba3d6',
+              color: colors.button,
               textDecoration: 'none',
               fontWeight: 'bold'
             }}>

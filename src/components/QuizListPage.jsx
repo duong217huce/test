@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import Header from './Header';
+import Footer from './Footer';
 
 export default function QuizListPage() {
   const navigate = useNavigate();
@@ -248,6 +249,7 @@ export default function QuizListPage() {
           </div>
         )}
       </div>
+      <Footer />
     </div>
   );
 }

@@ -6,7 +6,8 @@ export default function FilterBar({
   onFilterChange,
   searchKeyword,
   onSearchChange,
-  onApply 
+  onApply,
+  showApplyButton = true
 }) {
   if (!filterConfig) return null;
 
@@ -97,22 +98,24 @@ export default function FilterBar({
         </div>
         
         {/* Apply button */}
-        <button
-          onClick={onApply}
-          style={{
-            padding: '10px 30px',
-            background: '#4ba3d6',
-            color: '#fff',
-            border: 'none',
-            borderRadius: '6px',
-            fontSize: '14px',
-            fontWeight: 'bold',
-            cursor: 'pointer',
-            minWidth: '120px'
-          }}
-        >
-          Áp dụng
-        </button>
+        {showApplyButton && (
+          <button
+            onClick={onApply}
+            style={{
+              padding: '10px 30px',
+              background: '#4ba3d6',
+              color: '#fff',
+              border: 'none',
+              borderRadius: '6px',
+              fontSize: '14px',
+              fontWeight: 'bold',
+              cursor: 'pointer',
+              minWidth: '120px'
+            }}
+          >
+            Áp dụng
+          </button>
+        )}
       </div>
       
       {/* Active filters display */}

@@ -1,6 +1,42 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import Header from './Header';
+import Footer from './Footer';
+
+// ✅ Component hiển thị ảnh bìa tài liệu
+function DocumentCover({ coverImage, title }) {
+  const [imageError, setImageError] = useState(false);
+
+  const containerStyle = {
+    background: 'linear-gradient(135deg, #b4cbe0 0%, #8eb4d4 100%)',
+    width: '100%',
+    height: '180px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: '48px',
+    overflow: 'hidden'
+  };
+
+  if (coverImage && !imageError) {
+    return (
+      <div style={containerStyle}>
+        <img 
+          src={coverImage}
+          alt={title}
+          onError={() => setImageError(true)}
+          style={{
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover'
+          }}
+        />
+      </div>
+    );
+  }
+  
+  return <div style={containerStyle}>📚</div>;
+}
 
 export default function SavedPage() {
   const navigate = useNavigate();
@@ -134,17 +170,7 @@ export default function SavedPage() {
                   to={`/document/${doc._id}`}
                   style={{ textDecoration: 'none', color: 'inherit' }}
                 >
-                  <div style={{
-                    background: 'linear-gradient(135deg, #b4cbe0 0%, #8eb4d4 100%)',
-                    width: '100%',
-                    height: '180px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: '48px'
-                  }}>
-                    📚
-                  </div>
+                  <DocumentCover coverImage={doc.coverImage} title={doc.title} />
                   <div style={{ padding: '15px' }}>
                     <div style={{ 
                       fontWeight: 'bold', 
@@ -214,6 +240,7 @@ export default function SavedPage() {
           </div>
         )}
       </div>
+      <Footer />
     </div>
   );
 }

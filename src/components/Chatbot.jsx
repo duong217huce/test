@@ -4,7 +4,7 @@ import Groq from 'groq-sdk';
 const Chatbot = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState([
-    { role: 'assistant', content: 'Xin chào! Tôi là trợ lý ảo EDUCONNECT. Tôi có thể giúp bạn tìm kiếm tài liệu, trả lời câu hỏi học tập, tra cứu thông tin. Bạn cần giúp gì?' }
+    { role: 'assistant', content: 'Chào huynh đài, có câu hỏi gì cần tiểu đệ giải đáp hay không?' }
   ]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -106,7 +106,7 @@ YÊU CẦU:
             width: '60px',
             height: '60px',
             borderRadius: '50%',
-            background: 'linear-gradient(135deg, #4ba3d6 0%, #0d7a4f 100%)',
+            background: '#094067',
             color: '#fff',
             display: 'flex',
             alignItems: 'center',
@@ -142,7 +142,7 @@ YÊU CẦU:
         }}>
           {/* Header */}
           <div style={{
-            background: 'linear-gradient(135deg, #4ba3d6 0%, #0d7a4f 100%)',
+            background: '#094067',
             color: '#fff',
             padding: '20px',
             borderRadius: '16px 16px 0 0',
@@ -151,8 +151,7 @@ YÊU CẦU:
             alignItems: 'center'
           }}>
             <div>
-              <div style={{ fontSize: '18px', fontWeight: 'bold' }}>🤖 EDUCONNECT AI</div>
-              <div style={{ fontSize: '12px', opacity: 0.9 }}>Powered by Groq</div>
+              <div style={{ fontSize: '18px', fontWeight: 'bold' }}>🤖 CHAT VĂN BOT</div>
             </div>
             <button
               onClick={() => setIsOpen(false)}
@@ -194,7 +193,7 @@ YÊU CẦU:
                   maxWidth: '80%',
                   padding: '12px 16px',
                   borderRadius: msg.role === 'user' ? '18px 18px 4px 18px' : '18px 18px 18px 4px',
-                  background: msg.role === 'user' ? '#4ba3d6' : '#fff',
+                  background: msg.role === 'user' ? '#094067' : '#fff',
                   color: msg.role === 'user' ? '#fff' : '#333',
                   fontSize: '14px',
                   lineHeight: '1.6',
@@ -247,7 +246,7 @@ YÊU CẦU:
                 disabled={loading || !input.trim()}
                 style={{
                   padding: '12px 20px',
-                  background: loading || !input.trim() ? '#ccc' : '#4ba3d6',
+                  background: loading || !input.trim() ? '#ccc' : '#094067',
                   color: '#fff',
                   border: 'none',
                   borderRadius: '25px',

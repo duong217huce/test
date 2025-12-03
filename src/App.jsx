@@ -11,6 +11,7 @@ import SavedPage from './components/SavedPage';
 import Chatbot from './components/Chatbot';
 import SearchPage from './components/SearchPage';  
 import RechargePage from './components/RechargePage';
+import PaymentCallbackPage from './components/PaymentCallbackPage';
 import QuizListPage from './components/QuizListPage';
 import CreateQuizPage from './components/CreateQuizPage';
 import QuizDetailPage from './components/QuizDetailPage';
@@ -53,6 +54,9 @@ function App() {
         
         {/* Trang nạp tiền */}
         <Route path="/recharge" element={<RechargePage />} />
+        
+        {/* Trang callback thanh toán VNPay */}
+        <Route path="/payment/callback" element={<PaymentCallbackPage />} />
         
         {/* ✅ QUIZ ROUTES - ĐÃ SỬA */}
         {/* Trang danh sách đề thi */}

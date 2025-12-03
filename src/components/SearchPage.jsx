@@ -1,6 +1,41 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import Header from './Header';
+import Footer from './Footer';
+
+// ✅ Component hiển thị ảnh bìa tài liệu
+function DocumentCover({ coverImage, title }) {
+  const [imageError, setImageError] = useState(false);
+
+  if (coverImage && !imageError) {
+    return (
+      <div style={{
+        width: '100%',
+        height: '140px',
+        borderRadius: '8px',
+        overflow: 'hidden',
+        marginBottom: '15px'
+      }}>
+        <img 
+          src={coverImage}
+          alt={title}
+          onError={() => setImageError(true)}
+          style={{
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover'
+          }}
+        />
+      </div>
+    );
+  }
+  
+  return (
+    <div style={{ fontSize: '40px', marginBottom: '15px', textAlign: 'center' }}>
+      📄
+    </div>
+  );
+}
 
 export default function SearchPage() {
   const navigate = useNavigate();
@@ -86,9 +121,7 @@ export default function SearchPage() {
                   e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.08)';
                 }}
               >
-                <div style={{ fontSize: '40px', marginBottom: '15px', textAlign: 'center' }}>
-                  📄
-                </div>
+                <DocumentCover coverImage={doc.coverImage} title={doc.title} />
                 <h3 style={{
                   color: '#133a5c',
                   fontSize: '16px',
@@ -129,6 +162,7 @@ export default function SearchPage() {
           </div>
         )}
       </div>
+      <Footer />
     </div>
   );
 }
